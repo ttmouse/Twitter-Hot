@@ -4,7 +4,7 @@ function extractTweetId(url) {
     return match ? match[1] : null;
 }
 
-// Render content items in masonry layout
+// Render content items in masonry layout with lazy loading
 function renderContent() {
     const contentList = document.getElementById('contentList');
     if (!contentList) {
@@ -12,6 +12,8 @@ function renderContent() {
         return;
     }
 
+    // Clear any existing content (including loading text)
+    contentList.innerHTML = '';
     contentList.className = 'masonry-grid';
 
     tweetUrls.forEach((url, index) => {
@@ -20,20 +22,61 @@ function renderContent() {
         contentItem.style.animationDelay = `${index * 0.05}s`;
 
         contentItem.innerHTML = `
-            <div class="tweet-embed-container" id="tweet-container-${index}">
+            <div class="tweet-embed-container" id="tweet-container-${index}" data-tweet-url="${url}" data-tweet-index="${index}">
                 <div class="tweet-loading">
                     <div class="loading-spinner"></div>
-                    <span>Loading tweet...</span>
+                    <span>准备加载...</span>
                 </div>
                 <div id="tweet-target-${index}"></div>
             </div>
         `;
 
         contentList.appendChild(contentItem);
+    });
 
-        // Auto load tweet
-        const container = document.getElementById(`tweet-container-${index}`);
-        loadTweet(url, container, index);
+    // Setup lazy loading for tweets
+    setupLazyLoadingForTweets();
+}
+
+// Setup lazy loading for tweets using IntersectionObserver
+function setupLazyLoadingForTweets() {
+    // IntersectionObserver options
+    const observerOptions = {
+        root: null, // viewport
+        rootMargin: '200px', // Start loading 200px before entering viewport
+        threshold: 0.01
+    };
+
+    // Create observer
+    const tweetObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            // Only load when entering viewport and not already loaded
+            if (entry.isIntersecting && !entry.target.classList.contains('loaded') && !entry.target.classList.contains('loading')) {
+                const container = entry.target;
+                const url = container.getAttribute('data-tweet-url');
+                const index = parseInt(container.getAttribute('data-tweet-index'));
+
+                // Mark as loading to prevent duplicate loads
+                container.classList.add('loading');
+
+                // Update loading text
+                const loadingSpan = container.querySelector('.tweet-loading span');
+                if (loadingSpan) {
+                    loadingSpan.textContent = 'Loading tweet...';
+                }
+
+                // Load the tweet
+                loadTweet(url, container, index);
+
+                // Stop observing this container
+                tweetObserver.unobserve(container);
+            }
+        });
+    }, observerOptions);
+
+    // Observe all tweet containers
+    document.querySelectorAll('.tweet-embed-container').forEach(container => {
+        tweetObserver.observe(container);
     });
 }
 
@@ -42,8 +85,9 @@ function loadTweet(url, container, index) {
     const tweetId = extractTweetId(url);
 
     if (!tweetId) {
-        container.innerHTML = '<p class="tweet-error">Unable to load tweet</p>';
+        container.innerHTML = '<p class="tweet-error">推文加载失败，刷新页面试试</p>';
         container.classList.add('loaded');
+        container.classList.remove('loading');
         return;
     }
 
@@ -69,11 +113,13 @@ function loadTweet(url, container, index) {
             }
             if (el) {
                 container.classList.add('loaded');
+                container.classList.remove('loading');
                 // Ensure proper alignment after loading
                 container.parentElement.style.alignSelf = 'flex-start';
             } else {
-                container.innerHTML = '<p class="tweet-error">Tweet failed to load</p>';
+                container.innerHTML = '<p class="tweet-error">推文加载失败，刷新页面试试</p>';
                 container.classList.add('loaded');
+                container.classList.remove('loading');
             }
         });
     };
@@ -94,7 +140,9 @@ function loadTweet(url, container, index) {
         setTimeout(() => {
             clearInterval(checkTwitter);
             if (!container.classList.contains('loaded') && container.querySelector('.tweet-loading')) {
-                container.innerHTML = '<p class="tweet-error">Tweet loading timeout</p>';
+                container.innerHTML = '<p class="tweet-error">加载超时，刷新页面试试</p>';
+                container.classList.add('loaded');
+                container.classList.remove('loading');
             }
         }, 10000);
     }
@@ -214,7 +262,18 @@ function loadAvailableDates() {
     // Add retry mechanism
     const fetchDates = (retryCount = 0) => {
         fetch('/api/dates')
-            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error(`HTTP error! status: ${r.status}`);
+                }
+                // Check if response is JSON
+                const contentType = r.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return r.json();
+                } else {
+                    throw new Error('Response is not JSON');
+                }
+            })
             .then(data => {
                 availableDates = data.dates || [];
 
@@ -336,6 +395,18 @@ function loadContentForDate(date) {
         return;
     }
 
+    try {
+        fetch('/api/pv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date }),
+            keepalive: true
+        });
+    } catch (e) { }
+
+    // Define storage key for this date
+    const storageKey = `tweets_${date}`;
+
     // Show loading state
     contentList.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading content...</div>';
     emptyState.style.display = 'none';
@@ -344,7 +415,18 @@ function loadContentForDate(date) {
     const url = `/api/data?date=${encodeURIComponent(date)}`;
 
     fetch(url)
-        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(r => {
+            if (!r.ok) {
+                throw new Error(`HTTP error! status: ${r.status}`);
+            }
+            // Check if response is JSON
+            const contentType = r.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return r.json();
+            } else {
+                throw new Error('Response is not JSON');
+            }
+        })
         .then(data => {
             const urls = Array.isArray(data && data.urls) ? data.urls : [];
             if (urls.length > 0) {
@@ -448,41 +530,6 @@ function saveDailySnapshot(date, urls) {
 function extractUrls(text) {
     const regex = /https?:\/\/(?:x\.com|twitter\.com)\/[a-zA-Z0-9_]+\/status\/\d+/g;
     return [...new Set(text.match(regex) || [])];
-}
-
-// Render content items in masonry layout
-function renderContent() {
-    const contentList = document.getElementById('contentList');
-    if (!contentList) {
-        // Not on the main page, so don't proceed
-        return;
-    }
-
-    // Clear any existing content (including loading text)
-    contentList.innerHTML = '';
-    contentList.className = 'masonry-grid';
-
-    tweetUrls.forEach((url, index) => {
-        const contentItem = document.createElement('div');
-        contentItem.className = 'masonry-item';
-        contentItem.style.animationDelay = `${index * 0.05}s`;
-
-        contentItem.innerHTML = `
-            <div class="tweet-embed-container" id="tweet-container-${index}">
-                <div class="tweet-loading">
-                    <div class="loading-spinner"></div>
-                    <span>Loading tweet...</span>
-                </div>
-                <div id="tweet-target-${index}"></div>
-            </div>
-        `;
-
-        contentList.appendChild(contentItem);
-
-        // Auto load tweet
-        const container = document.getElementById(`tweet-container-${index}`);
-        loadTweet(url, container, index);
-    });
 }
 
 // Add entrance animation

@@ -148,17 +148,6 @@
         Hot Content Quick Add
     </h1>
 
-    <div class="section">
-        <label for="apiEndpoint">API Endpoint</label>
-        <input type="url" id="apiEndpoint" placeholder="https://twitterhot.vercel.app/api/update"
-            value="https://twitterhot.vercel.app/api/update">
-    </div>
-
-    <button id="saveSettings">Save Settings</button>
-    <div id="saveStatus" class="status"></div>
-
-    <div class="divider"></div>
-
     <div class="quick-add-section">
         <div class="section">
             <label for="manualUrl">Quick Add URL</label>
@@ -173,6 +162,20 @@
     <div class="info-box">
         💡 <strong>How to use:</strong><br>
         Browse Twitter/X and click the "Add to Hot" button on any tweet you want to save to your collection.
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <label>🔗 Quick Links</label>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button id="openWebsite" style="flex: 1; background: #10a37f; font-size: 13px;">
+                🍌 View Site
+            </button>
+            <button id="openAdmin" style="flex: 1; background: #536471; font-size: 13px;">
+                ⚙️ Admin
+            </button>
+        </div>
     </div>
 
     <div class="footer">

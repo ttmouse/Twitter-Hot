@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator - Twitter Hot</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #15202b;
+            color: #fff;
+        }
+        h1 {
+            text-align: center;
+            color: #1d9bf0;
+        }
+        .canvas-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .canvas-item {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #38444d;
+            border-radius: 8px;
+            background: white;
+        }
+        button {
+            background: #1d9bf0;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1a8cd8;
+        }
+        .info {
+            background: rgba(29, 155, 240, 0.1);
+            border: 1px solid rgba(29, 155, 240, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Twitter Hot Icon Generator</h1>
+
+    <div class="info">
+        <p><strong>设计理念：</strong></p>
+        <ul>
+            <li>🐦 Twitter 蓝色 + 🔥 火焰橙红色</li>
+            <li>🌟 星形背景象征"热门"</li>
+            <li>🔥 火焰元素表达"HOT"概念</li>
+        </ul>
+    </div>
+
+    <div class="canvas-container">
+        <div class="canvas-item">
+            <canvas id="icon16" width="16" height="16"></canvas>
+            <p>16x16</p>
+            <button onclick="downloadIcon('icon16', 'icon16.png')">Download</button>
+        </div>
+        <div class="canvas-item">
+            <canvas id="icon48" width="48" height="48"></canvas>
+            <p>48x48</p>
+            <button onclick="downloadIcon('icon48', 'icon48.png')">Download</button>
+        </div>
+        <div class="canvas-item">
+            <canvas id="icon128" width="128" height="128"></canvas>
+            <p>128x128</p>
+            <button onclick="downloadIcon('icon128', 'icon128.png')">Download</button>
+        </div>
+    </div>
+
+    <div style="text-align: center;">
+        <button onclick="downloadAll()" style="background: #10a37f; font-size: 16px;">📦 Download All Icons</button>
+    </div>
+
+    <script>
+        function drawIcon(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+
+            // Background gradient (Twitter blue to darker blue)
+            const bgGradient = ctx.createLinearGradient(0, 0, size, size);
+            bgGradient.addColorStop(0, '#1d9bf0');
+            bgGradient.addColorStop(1, '#0c7abf');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw star burst pattern in background (subtle)
+            ctx.save();
+            ctx.globalAlpha = 0.15;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = size * 0.02;
+            const center = size / 2;
+            for (let i = 0; i < 12; i++) {
+                const angle = (i * Math.PI) / 6;
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.lineTo(
+                    center + Math.cos(angle) * size * 0.45,
+                    center + Math.sin(angle) * size * 0.45
+                );
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Draw flame icon (HOT concept)
+            ctx.save();
+            ctx.translate(center, center);
+
+            // Main flame body
+            const flameScale = size / 128;
+
+            // Outer flame (orange-red)
+            ctx.fillStyle = '#FF6B35';
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 0.35);
+            ctx.bezierCurveTo(
+                size * 0.15, -size * 0.3,
+                size * 0.2, -size * 0.1,
+                size * 0.15, size * 0.1
+            );
+            ctx.bezierCurveTo(
+                size * 0.1, size * 0.2,
+                0, size * 0.25,
+                0, size * 0.25
+            );
+            ctx.bezierCurveTo(
+                0, size * 0.25,
+                -size * 0.1, size * 0.2,
+                -size * 0.15, size * 0.1
+            );
+            ctx.bezierCurveTo(
+                -size * 0.2, -size * 0.1,
+                -size * 0.15, -size * 0.3,
+                0, -size * 0.35
+            );
+            ctx.fill();
+
+            // Inner flame (yellow-orange)
+            ctx.fillStyle = '#FFB627';
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 0.25);
+            ctx.bezierCurveTo(
+                size * 0.1, -size * 0.2,
+                size * 0.12, -size * 0.05,
+                size * 0.08, size * 0.05
+            );
+            ctx.bezierCurveTo(
+                size * 0.05, size * 0.12,
+                0, size * 0.15,
+                0, size * 0.15
+            );
+            ctx.bezierCurveTo(
+                0, size * 0.15,
+                -size * 0.05, size * 0.12,
+                -size * 0.08, size * 0.05
+            );
+            ctx.bezierCurveTo(
+                -size * 0.12, -size * 0.05,
+                -size * 0.1, -size * 0.2,
+                0, -size * 0.25
+            );
+            ctx.fill();
+
+            // Hot spot (white-yellow)
+            ctx.fillStyle = '#FFEB99';
+            ctx.beginPath();
+            ctx.ellipse(0, size * 0.05, size * 0.04, size * 0.06, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Add sparkles around flame
+            ctx.fillStyle = '#FFD700';
+            const sparkles = [
+                { x: 0.3, y: 0.25, size: 0.03 },
+                { x: 0.7, y: 0.3, size: 0.025 },
+                { x: 0.25, y: 0.65, size: 0.028 },
+                { x: 0.75, y: 0.7, size: 0.023 }
+            ];
+
+            sparkles.forEach(sparkle => {
+                const sx = size * sparkle.x;
+                const sy = size * sparkle.y;
+                const ssize = size * sparkle.size;
+
+                // Draw star sparkle
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.beginPath();
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i * Math.PI) / 2;
+                    ctx.lineTo(Math.cos(angle) * ssize, Math.sin(angle) * ssize);
+                    ctx.lineTo(
+                        Math.cos(angle + Math.PI / 4) * ssize * 0.4,
+                        Math.sin(angle + Math.PI / 4) * ssize * 0.4
+                    );
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // Draw all icons on page load
+        drawIcon('icon16');
+        drawIcon('icon48');
+        drawIcon('icon128');
+
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function downloadAll() {
+            setTimeout(() => downloadIcon('icon16', 'icon16.png'), 100);
+            setTimeout(() => downloadIcon('icon48', 'icon48.png'), 300);
+            setTimeout(() => downloadIcon('icon128', 'icon128.png'), 500);
+        }
+    </script>
+</body>
+</html>

@@ -96,6 +96,12 @@
                 <label for="publishDate">发布日期</label>
                 <input type="date" id="publishDate" class="form-control">
             </div>
+            <div class="form-group">
+                <div id="pvInfo" style="display:flex;gap:8px;align-items:center;font-size:0.95rem;color:var(--text-secondary)">
+                    <span>当前日期 PV</span>
+                    <strong id="pvCount">-</strong>
+                </div>
+            </div>
 
             <div class="form-group">
                 <label for="rawContent">原始内容 (粘贴 Grok 文本)</label>
@@ -132,6 +138,7 @@
             const textarea = document.getElementById('rawContent');
             const publishBtn = document.getElementById('publishBtn');
             const statusMsg = document.getElementById('statusMsg');
+            const pvCount = document.getElementById('pvCount');
 
             // Auto-detect links on input
             textarea.addEventListener('input', () => {
@@ -142,6 +149,7 @@
             document.getElementById('publishDate').addEventListener('change', () => {
                 const d = document.getElementById('publishDate').value;
                 if (d) frontLink.href = 'index.html?date=' + d;
+                if (d) fetch('/api/pv?date=' + encodeURIComponent(d)).then(r => r.ok ? r.json() : Promise.reject()).then(data => { pvCount.textContent = (data && typeof data.pv === 'number') ? data.pv : '-'; }).catch(() => { pvCount.textContent = '-'; });
             });
 
             // Publish action
@@ -188,6 +196,10 @@
                 // Optional: Clear input
                 // textarea.value = '';
             });
+
+            if (today) {
+                fetch('/api/pv?date=' + encodeURIComponent(today)).then(r => r.ok ? r.json() : Promise.reject()).then(data => { pvCount.textContent = (data && typeof data.pv === 'number') ? data.pv : '-'; }).catch(() => { pvCount.textContent = '-'; });
+            }
         });
 
         function updatePreview(urls) {

@@ -1,17 +1,15 @@
 // Twitter Hot Content Quick Add - Popup Script
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const apiEndpointInput = document.getElementById('apiEndpoint');
-    const saveSettingsBtn = document.getElementById('saveSettings');
-    const saveStatus = document.getElementById('saveStatus');
     const manualUrlInput = document.getElementById('manualUrl');
     const quickAddBtn = document.getElementById('quickAdd');
     const addStatus = document.getElementById('addStatus');
 
-    // Load saved settings
+    // Set default API endpoint (hidden from user)
+    const defaultEndpoint = 'https://twitterhot.vercel.app/api/update';
     chrome.storage.sync.get(['apiEndpoint'], (result) => {
-        if (result.apiEndpoint) {
-            apiEndpointInput.value = result.apiEndpoint;
+        if (!result.apiEndpoint) {
+            chrome.storage.sync.set({ apiEndpoint: defaultEndpoint });
         }
     });
 
@@ -51,6 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 manualUrlInput.value = tweetUrl;
                 urlDetectedFromPage = true;
                 highlightButton('page');
+
+                // Auto-submit if on tweet page
+                setTimeout(() => {
+                    quickAddBtn.click();
+                }, 300); // Small delay to show the UI update
             }
         }
     } catch (error) {
@@ -65,41 +68,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (twitterUrl) {
                 manualUrlInput.value = twitterUrl;
                 highlightButton('clipboard');
+
+                // Auto-submit if clipboard contains Twitter URL
+                setTimeout(() => {
+                    quickAddBtn.click();
+                }, 300); // Small delay to show the UI update
             }
         } catch (error) {
             // Clipboard access may be denied, silently ignore
             console.log('Clipboard access not available:', error.message);
         }
     }
-
-    // Save settings
-    saveSettingsBtn.addEventListener('click', () => {
-        const endpoint = apiEndpointInput.value.trim();
-
-        if (!endpoint) {
-            showStatus(saveStatus, 'Please enter an API endpoint', 'error');
-            return;
-        }
-
-        // Validate URL format
-        try {
-            new URL(endpoint);
-        } catch (e) {
-            showStatus(saveStatus, 'Invalid URL format', 'error');
-            return;
-        }
-
-        chrome.storage.sync.set({ apiEndpoint: endpoint }, () => {
-            showStatus(saveStatus, '✓ Settings saved!', 'success');
-
-            // Reload content scripts to use new endpoint
-            chrome.tabs.query({ url: ['https://twitter.com/*', 'https://x.com/*'] }, (tabs) => {
-                tabs.forEach(tab => {
-                    chrome.tabs.reload(tab.id);
-                });
-            });
-        });
-    });
 
     // Quick add manual URL
     quickAddBtn.addEventListener('click', async () => {
@@ -120,7 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         quickAddBtn.textContent = 'Adding...';
 
         try {
-            const endpoint = apiEndpointInput.value.trim();
+            const endpoint = defaultEndpoint;
 
             // Get current date in local timezone (YYYY-MM-DD format)
             const now = new Date();
@@ -169,15 +148,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Allow Enter key to submit
-    apiEndpointInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            saveSettingsBtn.click();
-        }
-    });
-
     manualUrlInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             quickAddBtn.click();
         }
+    });
+
+    // Quick Links buttons
+    document.getElementById('openWebsite').addEventListener('click', () => {
+        chrome.tabs.create({ url: 'https://twitterhot.vercel.app' });
+    });
+
+    document.getElementById('openAdmin').addEventListener('click', () => {
+        chrome.tabs.create({ url: 'https://twitterhot.vercel.app/admin.html' });
     });
 });

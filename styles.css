@@ -745,9 +745,12 @@ body {
 /* Tweet Error State */
 .tweet-error {
     text-align: center;
-    color: var(--text-muted);
+    color: #8b98a5;
     padding: var(--spacing-md);
     font-size: 0.9375rem;
+    background: rgba(139, 152, 165, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(139, 152, 165, 0.2);
 }
 
 /* Twitter Embed Styling Override */
