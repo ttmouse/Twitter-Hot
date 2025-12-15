@@ -8,21 +8,99 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .admin-container {
-            max-width: 800px;
+        :root {
+            --sidebar-width: 280px;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            overflow: hidden;
+            /* Prevent body scroll, handle inside main */
+            height: 100vh;
+            padding: 0 !important;
+        }
+
+        .admin-layout {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .brand-area {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .brand-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .brand-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+        }
+
+
+        /* Main Content Styling */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .main-container {
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 2rem;
         }
 
-        .admin-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-        }
-
+        /* Form Controls */
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-group label {
@@ -30,93 +108,523 @@
             margin-bottom: 0.5rem;
             color: var(--text-secondary);
             font-weight: 500;
+            font-size: 0.9rem;
         }
 
         .form-control {
             width: 100%;
-            background: var(--bg-primary);
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             padding: 0.75rem;
             color: var(--text-primary);
             font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-primary);
+            outline: none;
         }
 
         textarea.form-control {
-            height: 300px;
+            height: 150px;
             font-family: monospace;
             resize: vertical;
+            font-size: 0.85rem;
+            line-height: 1.4;
         }
 
+        textarea.form-control:focus {
+            height: 300px;
+            /* Expands on focus */
+            transition: height 0.3s ease;
+        }
+
+        /* Buttons & Status */
         .btn-block {
             width: 100%;
-            padding: 1rem;
-            font-size: 1.1rem;
+            padding: 0.875rem;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            border: none;
+            background: var(--accent-primary);
+            color: white;
+            transition: opacity 0.2s;
+        }
+
+        .btn-block:hover {
+            opacity: 0.9;
         }
 
         .status-message {
             margin-top: 1rem;
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            line-height: 1.4;
             display: none;
         }
 
         .status-success {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
 
-        .preview-list {
-            margin-top: 1rem;
-            border-top: 1px solid var(--border-color);
-            padding-top: 1rem;
-        }
-
-        .preview-item {
-            padding: 0.5rem;
-            border-bottom: 1px solid var(--border-color);
+        .status-error {
+            background: rgba(0, 0, 0, 0.4);
             color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Preview Panel */
+        .preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2rem 0 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .preview-header h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .select-all-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Masonry Grid for Preview */
+        .masonry-preview {
+            column-count: 3;
+            column-gap: 1.5rem;
+        }
+
+        @media (max-width: 1400px) {
+            .masonry-preview {
+                column-count: 2;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .masonry-preview {
+                column-count: 1;
+            }
+        }
+
+        .masonry-preview.image-mode-grid {
+            column-count: 4;
+            column-gap: 0.75rem;
+        }
+
+        @media (max-width: 1200px) {
+            .masonry-preview.image-mode-grid {
+                column-count: 3;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .masonry-preview.image-mode-grid {
+                column-count: 2;
+            }
+        }
+
+        @media (max-width: 540px) {
+            .masonry-preview.image-mode-grid {
+                column-count: 1;
+            }
+        }
+
+        /* Tweet Card Styling */
+        .tweet-card-wrapper {
+            break-inside: avoid;
+            margin-bottom: 1.5rem;
+            position: relative;
+            transition: all 0.2s;
+            overflow: hidden;
+        }
+
+        .tweet-card-wrapper:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .tweet-card-wrapper.selected {
+            /* border-color: var(--accent-primary); Removed as per user request */
+            background: var(--bg-card-hover);
+        }
+
+        .tweet-card-wrapper.unchecked {
+            opacity: 0.5;
+            filter: grayscale(1);
+            border-color: var(--border-color);
+        }
+
+        .card-select-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        /* Inner Content */
+        .preview-text-item {
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 0.5rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* New Layout Styles */
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .brand-area {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .brand-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .brand-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .sidebar-nav {
+            flex-grow: 1;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-label {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .primary-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .primary-btn:hover {
+            background: var(--accent-secondary);
+        }
+
+        .content-link:hover {
+            background: var(--bg-primary);
+        }
+
+        /* Specific styles for list mode items */
+        .tweet-check-wrapper {
+            display: flex;
+            align-items: flex-start;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 0.75rem 1rem;
+            transition: all 0.2s;
+            break-inside: avoid;
+            /* For masonry-like behavior in list mode if needed */
+        }
+
+        .tweet-check-wrapper.selected {
+            border-color: var(--accent-primary);
+            background: var(--bg-card-hover);
+        }
+
+        .tweet-check-wrapper.unchecked {
+            opacity: 0.5;
+            filter: grayscale(1);
+            border-color: var(--border-color);
+        }
+
+        .tweet-check-wrapper .tweet-content {
+            flex-grow: 1;
+            padding-left: 0.75rem;
+        }
+
+
+        /* Toggle Switch */
+        .mode-toggle {
+            display: flex;
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            padding: 2px;
+            position: relative;
+        }
+
+        .mode-toggle input {
+            display: none;
+        }
+
+        .mode-toggle label {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 12px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .mode-toggle input:checked+label {
+            background: var(--accent-primary);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Image Mode Styles */
+        .image-mode-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            break-inside: avoid;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .image-mode-grid .image-mode-card {
+            margin-bottom: 0.75rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .image-mode-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .image-mode-actions {
+            padding: 10px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .loading-placeholder {
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tweet-check-wrapper input[type="checkbox"] {
+            margin-top: 0.2rem;
+            /* Align checkbox better with text */
+        }
+
+
+        .fab-publish {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 100;
+            padding: 1rem 1.5rem;
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: auto;
+            transform: translateY(0);
+            transition: all 0.2s ease;
+        }
+
+        .fab-publish:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+        }
+
+        .fab-publish:active {
+            transform: translateY(0);
         }
     </style>
 </head>
 
 <body>
-    <div class="admin-container">
-        <header class="header">
-            <h1>🚀 内容发布后台</h1>
-            <p class="subtitle">Twitter 热门内容每日更新</p>
-        </header>
-
-        <div class="admin-card">
-            <div class="form-group">
-                <label for="publishDate">发布日期</label>
-                <input type="date" id="publishDate" class="form-control">
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand-area">
+                <span class="brand-title">🚀 Nano Admin</span>
+                <span class="brand-subtitle">Content curation dashboard</span>
             </div>
 
-            <div class="form-group">
-                <label for="rawContent">原始内容 (粘贴 Grok 文本)</label>
-                <textarea id="rawContent" class="form-control" placeholder="在此粘贴包含 Twitter 链接的文本..."></textarea>
-            </div>
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-label">P U B L I S H</div>
+                    <div class="form-group">
+                        <label for="publishDate">Select Date</label>
+                        <input type="date" id="publishDate" class="form-control">
+                    </div>
+                    <!-- Load Data Button (Previously dynamic) -->
+                    <button id="loadDataBtn" class="primary-btn btn-block"
+                        style="background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color);">🔄
+                        Load Cloud Data</button>
+                    <!-- Status message area -->
+                    <div id="statusMsg" class="status-message"></div>
+                </div>
 
-            <div class="form-group">
-                <div id="previewArea" style="display: none;">
-                    <label>识别到的链接 (<span id="linkCount">0</span> 条)</label>
-                    <div id="linkList" class="preview-list"></div>
+                <div class="sidebar-section">
+                    <div class="sidebar-label">L I N K S</div>
+                    <a id="frontLink" href="index.html" target="_blank" class="content-link"
+                        style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text-secondary); font-size: 0.9rem; padding: 8px; border-radius: 6px; transition: background 0.2s;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                        </svg>
+                        View Live Site
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="brand-subtitle">v1.3.0 • Admin Panel</div>
+            </div>
+        </aside>
+
+        <!-- Floating Action Button for Publish -->
+        <button id="publishBtn" class="fab-publish primary-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path
+                    d="M21.2 15c.7 0 1.2-.5 1.2-1.2V3.8c0-.7-.5-1.2-1.2-1.2H10.8c-.7 0-1.2.5-1.2 1.2v10c0 .7.5 1.2 1.2 1.2h10.4z">
+                </path>
+                <path d="M7.8 19c-.7 0-1.2-.5-1.2-1.2V7.4"></path>
+                <path d="M4.4 23c-.7 0-1.2-.5-1.2-1.2v-12"></path>
+            </svg>
+            Publish Updates
+        </button>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="main-container">
+                <!-- Input Area -->
+                <div style="margin-bottom: 2rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 style="font-size: 1.5rem; margin: 0;">Import Content</h2>
+
+                        <!-- Preview Mode Toggle -->
+                        <div class="toggle-switch-wrapper"
+                            style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border-color);">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Preview:</span>
+                            <div class="mode-toggle">
+                                <input type="radio" name="previewMode" id="modeStandard" value="standard" checked>
+                                <label for="modeStandard">Standard</label>
+                                <input type="radio" name="previewMode" id="modeImages" value="images">
+                                <label for="modeImages">Images Only</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <textarea id="rawContent" class="form-control"
+                            placeholder="Paste Grok output or raw Twitter links here..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Preview Area -->
+                <div id="previewPanel">
+                    <div class="preview-header">
+                        <div>
+                            <h2>Content Preview</h2>
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">Detected <span id="linkCount"
+                                    style="color: var(--text-primary); font-weight: 600;">0</span> links</span>
+                        </div>
+                        <label class="select-all-wrap">
+                            <input type="checkbox" id="selectAll" checked> Select / Deselect All
+                        </label>
+                    </div>
+
+                    <div id="linkList" class="masonry-preview"></div>
                 </div>
             </div>
-
-            <button id="publishBtn" class="primary-btn btn-block">发布更新</button>
-
-            <div id="statusMsg" class="status-message"></div>
-        </div>
-
-        <div style="text-align: center; margin-top: 2rem;">
-            <a id="frontLink" href="index.html" target="_blank" class="content-link">查看前台效果 &rarr;</a>
-        </div>
+        </main>
     </div>
 
     <script src="script.js"></script>
@@ -132,11 +640,21 @@
             const textarea = document.getElementById('rawContent');
             const publishBtn = document.getElementById('publishBtn');
             const statusMsg = document.getElementById('statusMsg');
-
             // Auto-detect links on input
             textarea.addEventListener('input', () => {
                 const urls = extractUrls(textarea.value);
                 updatePreview(urls);
+            });
+
+
+
+            // Select All logic
+            document.getElementById('selectAll').addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                document.querySelectorAll('.tweet-check-input').forEach(cb => {
+                    cb.checked = checked;
+                    toggleItemStyle(cb);
+                });
             });
 
             document.getElementById('publishDate').addEventListener('change', () => {
@@ -144,7 +662,108 @@
                 if (d) frontLink.href = 'index.html?date=' + d;
             });
 
-            // Publish action
+            // Load Data logic
+            const loadDataBtn = document.getElementById('loadDataBtn');
+            loadDataBtn.onclick = async () => {
+                const date = document.getElementById('publishDate').value;
+                if (!date) return showStatus('Please select a date first', 'error');
+
+                const originalText = loadDataBtn.textContent;
+                loadDataBtn.textContent = 'Loading...';
+                loadDataBtn.disabled = true;
+
+                try {
+                    const res = await apiFetch(`/api/data?date=${date}`);
+                    if (!res.ok) throw new Error('服务器返回异常状态');
+                    const data = await res.json();
+                    const urls = data.urls || [];
+
+                    document.getElementById('rawContent').value = urls.join('\n');
+                    updatePreview(urls);
+                    showStatus(`Loaded ${urls.length} items from server`, 'success');
+                } catch (e) {
+                    showStatus('Failed to load data', 'error');
+                    console.error(e);
+                } finally {
+                    loadDataBtn.textContent = originalText;
+                    loadDataBtn.disabled = false;
+                }
+            };
+
+            // Delete action
+            // Delete action
+            window.deleteUrl = async (url) => {
+                if (!confirm('Are you sure you want to delete this tweet?')) return;
+
+                // Find all UI elements for this URL immediately
+                const inputs = document.querySelectorAll(`input[value="${url}"]`);
+                const cards = [];
+                inputs.forEach(input => {
+                    const card = input.closest('.tweet-card-wrapper') || input.closest('.tweet-check-wrapper');
+                    if (card) cards.push(card);
+                });
+
+                const date = document.getElementById('publishDate').value;
+
+                try {
+                    // Optimistic UI update: Fade out immediately
+                    cards.forEach(card => {
+                        card.style.transition = 'all 0.3s ease';
+                        card.style.opacity = '0.5';
+                        card.style.pointerEvents = 'none';
+                    });
+
+                    const res = await apiFetch('/api/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date, url })
+                    });
+                    const data = await res.json();
+
+                    if (data.ok) {
+                        showStatus('Deleted successfully', 'success');
+
+                        // Permanent UI disabled state
+                        inputs.forEach(input => input.checked = false);
+                        cards.forEach(card => {
+                            card.classList.add('deleted-item');
+                            card.style.opacity = '0.3';
+                            card.style.filter = 'grayscale(100%)';
+
+                            // Change button text
+                            const btn = card.querySelector('.delete-btn');
+                            if (btn) {
+                                btn.innerHTML = '已删除';
+                                btn.style.background = 'transparent';
+                                btn.style.color = 'var(--text-muted)';
+                            }
+                        });
+
+                        // Fix: Also remove from textarea so it doesn't get re-submitted
+                        const textarea = document.getElementById('rawContent');
+                        if (textarea) {
+                            const currentText = textarea.value;
+                            // Replace URL with empty string, handling potential newlines
+                            const newText = currentText.replace(url, '').replace(/^\s*[\r\n]/gm, '');
+                            textarea.value = newText;
+                        }
+
+                        // Crucially: DO NOT reload data
+                    } else {
+                        throw new Error(data.message || 'Unknown error');
+                    }
+                } catch (e) {
+                    console.error('Delete error:', e);
+                    showStatus('Error deleting tweet: ' + e.message, 'error');
+
+                    // Revert UI on failure
+                    cards.forEach(card => {
+                        card.style.opacity = '1';
+                        card.style.pointerEvents = 'auto';
+                    });
+                }
+            };
+
             publishBtn.addEventListener('click', async () => {
                 const date = document.getElementById('publishDate').value;
                 const urls = extractUrls(textarea.value);
@@ -166,10 +785,21 @@
                     return;
                 }
 
-                const result = await saveDailySnapshot(d, urls);
+                // Get SELECTED urls
+                const selectedUrls = [];
+                document.querySelectorAll('.tweet-check-input:checked').forEach(cb => {
+                    selectedUrls.push(cb.value);
+                });
+
+                if (selectedUrls.length === 0) {
+                    showStatus('未选中任何链接进行发布', 'error');
+                    return;
+                }
+
+                const result = await saveDailySnapshot(d, selectedUrls);
                 if (result && result.remoteSaved) {
                     let message = `✅ 已同步服务器并发布 ${d} 的内容`;
-                    
+
                     // 如果有详细信息，显示更详细的状态
                     if (result.totalUrls !== undefined) {
                         message += `，共 ${result.totalUrls} 条链接`;
@@ -177,9 +807,9 @@
                             message += `（新增 ${result.newUrls} 条，${result.totalUrls - result.newUrls} 条为去重后的已存在链接）`;
                         }
                     } else {
-                        message += `，${urls.length} 条链接`;
+                        message += `，${selectedUrls.length} 条链接`;
                     }
-                    
+
                     showStatus(message, 'success');
                 } else {
                     showStatus(`⚠️ 已更新本地缓存，但服务器存储未生效`, 'error');
@@ -188,34 +818,149 @@
                 // Optional: Clear input
                 // textarea.value = '';
             });
+
+            // Mode Toggle Listener
+            document.querySelectorAll('input[name="previewMode"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    const urls = extractUrls(textarea.value);
+                    updatePreview(urls);
+                });
+            });
         });
 
-        function updatePreview(urls) {
-            const previewArea = document.getElementById('previewArea');
-            const linkCount = document.getElementById('linkCount');
-            const linkList = document.getElementById('linkList');
+        // Update Preview (Main Logic)
+        async function updatePreview(urls) {
+            const list = document.getElementById('linkList');
+            const count = document.getElementById('linkCount');
+            count.textContent = urls.length;
 
-            if (urls.length > 0) {
-                previewArea.style.display = 'block';
-                linkCount.textContent = urls.length;
-                linkList.innerHTML = urls.map((url, i) => `
-                    <div class="preview-item">
-                        <span>#${i + 1}</span>
-                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:10px;">${url}</span>
-                    </div>
-                `).join('');
-            } else {
-                previewArea.style.display = 'none';
+            // Get current mode
+            const mode = document.querySelector('input[name="previewMode"]:checked').value;
+            list.classList.toggle('image-mode-grid', mode === 'images');
+
+            list.innerHTML = '';
+
+            if (urls.length === 0) {
+                list.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 4rem;">No links detected yet...</div>';
+                return;
             }
+
+            if (mode === 'images') {
+                // Image Only Mode
+                renderImagePreview(urls, list);
+            } else {
+                // Standard Mode
+                urls.forEach((url, i) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'tweet-card-wrapper';
+                    wrapper.innerHTML = `
+                            <div class="card-select-overlay">
+                                <input type="checkbox" class="tweet-check-input" value="${url}" checked onchange="toggleItemStyle(this)">
+                            </div>
+                            <div class="tweet-embed-container" id="preview-tweet-${i}"></div>
+                             <div style="padding: 10px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                                <button class="delete-btn" onclick="window.deleteUrl('${url}')" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    Del
+                                </button>
+                            </div>
+                        `;
+                    list.appendChild(wrapper);
+
+                    // Async load tweet
+                    if (window.twttr) {
+                        const id = extractTweetId(url);
+                        if (id) window.twttr.widgets.createTweet(id, document.getElementById(`preview-tweet-${i}`), { theme: 'dark' });
+                    }
+                });
+            }
+        }
+
+        // Render Image Preview Logic
+        async function renderImagePreview(urls, container) {
+            // Render placeholders first
+            urls.forEach((url, i) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-mode-card';
+                wrapper.id = `img-card-${i}`;
+                wrapper.innerHTML = `
+                        <div class="loading-placeholder" id="img-load-${i}">
+                            <div class="loading-spinner" style="width: 20px; height: 20px;"></div>
+                            <span style="font-size: 0.8rem;">Loading Info...</span>
+                        </div>
+                        <div class="image-mode-actions">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                                <input type="checkbox" class="tweet-check-input" value="${url}" checked onchange="toggleItemStyle(this)"> Select
+                            </label>
+                            <button class="delete-btn" onclick="window.deleteUrl('${url}')" style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                🗑️ Del
+                            </button>
+                        </div>
+                    `;
+                container.appendChild(wrapper);
+
+                // Fetch data
+                const id = extractTweetId(url);
+                if (id) {
+                    apiFetch(`/api/tweet_info?id=${id}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const placeholder = document.getElementById(`img-load-${i}`);
+                            if (!placeholder) return;
+
+                            const findFirstImage = () => {
+                                if (Array.isArray(data.media_extended)) {
+                                    const imgMedia = data.media_extended.find(m => m.type === 'image' && m.url);
+                                    if (imgMedia) return imgMedia.url;
+                                }
+                                if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) {
+                                    return data.mediaURLs[0];
+                                }
+                                return null;
+                            };
+
+                            const firstImage = findFirstImage();
+
+                            if (firstImage) {
+                                placeholder.outerHTML = `<img src="${firstImage}" loading="lazy" alt="Tweet Image">`;
+                            } else {
+                                placeholder.outerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">No Images Found</div>`;
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            const placeholder = document.getElementById(`img-load-${i}`);
+                            if (placeholder) placeholder.innerHTML = '<span style="color: var(--text-primary); font-size: 0.8rem;">Failed to load info</span>';
+                        });
+                }
+            });
+        }
+
+        function toggleItemStyle(checkbox) {
+            // Updated to handle new wrapper class
+            const wrapper = checkbox.closest('.tweet-card-wrapper') || checkbox.closest('.tweet-check-wrapper') || checkbox.closest('.image-mode-card');
+            if (checkbox.checked) {
+                wrapper.classList.remove('unchecked');
+                wrapper.classList.add('selected');
+            } else {
+                wrapper.classList.add('unchecked');
+                wrapper.classList.remove('selected');
+            }
+
+            // Update Select All state
+            const all = document.querySelectorAll('.tweet-check-input');
+            const checked = document.querySelectorAll('.tweet-check-input:checked');
+            document.getElementById('selectAll').checked = all.length > 0 && all.length === checked.length;
         }
 
         function showStatus(msg, type) {
             const el = document.getElementById('statusMsg');
             el.textContent = msg;
             el.style.display = 'block';
-            el.className = 'status-message ' + (type === 'success' ? 'status-success' : '');
+            el.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
         }
     </script>
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 </body>
 
 </html>

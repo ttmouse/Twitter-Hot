@@ -1,1 +1,17 @@
-{"rewrites":[{"source":"/api/(.*)","destination":"/api/$1"},{"source":"/(.*)","destination":"/index.html"}]}
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://platform.twitter.com https://*.twitter.com https://*.vercel-insights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.twimg.com; font-src 'self' https://fonts.gstatic.com; frame-src https://platform.twitter.com https://*.twitter.com; connect-src 'self' https://platform.twitter.com https://*.twitter.com https://*.twimg.com"
+        }
+      ]
+    }
+  ]
+}

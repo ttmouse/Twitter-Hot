@@ -2,9 +2,7 @@
   "name": "twitter-hot",
   "version": "1.0.0",
   "description": "Twitter热门内容监控",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
     "dev": "vercel dev"
   },
   "dependencies": {

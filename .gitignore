@@ -221,3 +221,5 @@ Thumbs.db
 # Logs
 logs/
 *.log
+.gitignore
+.env.example
