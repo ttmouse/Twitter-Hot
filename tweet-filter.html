@@ -9,6 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Tweet Detail Modal Component Styles -->
+    <link rel="stylesheet" href="tweet-detail-modal.css">
     <style>
         :root {
             /* Dark Mode (Default) */
@@ -775,283 +777,7 @@
             opacity: 0.8;
         }
 
-        /* Tweet Detail Modal */
-        .tweet-detail-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
-            z-index: 9999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            animation: fadeIn 0.2s ease;
-        }
-
-        .tweet-detail-modal.show {
-            display: flex;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .tweet-detail-content {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            max-width: 800px;
-            max-height: 90vh;
-            width: 100%;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .tweet-detail-header {
-            padding: 1.25rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--muted);
-        }
-
-        .tweet-detail-user {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex: 1;
-        }
-
-        .tweet-detail-position {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--muted-foreground);
-            margin-left: auto;
-            margin-right: 1rem;
-        }
-
-        .tweet-detail-selected-indicator {
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-            border: 2px solid var(--border);
-            background: var(--background);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 0.5rem;
-            transition: all var(--transition);
-        }
-
-        .tweet-detail-selected-indicator.selected {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--accent-foreground);
-            box-shadow: var(--shadow-accent);
-        }
-
-        .tweet-detail-selected-indicator svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0;
-            stroke: currentColor;
-            stroke-width: 3;
-            fill: none;
-            transition: opacity var(--transition);
-        }
-
-        .tweet-detail-selected-indicator.selected svg {
-            opacity: 1;
-        }
-
-        .tweet-detail-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: 2px solid var(--border);
-        }
-
-        .tweet-detail-user-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tweet-detail-name {
-            font-weight: 600;
-            color: var(--foreground);
-            font-size: 0.95rem;
-        }
-
-        .tweet-detail-username {
-            color: var(--muted-foreground);
-            font-size: 0.85rem;
-            font-family: 'IBM Plex Mono', monospace;
-        }
-
-        .tweet-detail-close {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: none;
-            background: transparent;
-            color: var(--muted-foreground);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all var(--transition);
-        }
-
-        .tweet-detail-close:hover {
-            background: var(--muted);
-            color: var(--foreground);
-        }
-
-        .tweet-detail-body {
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .tweet-detail-images {
-            display: grid;
-            gap: 0.5rem;
-            background: var(--muted);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .tweet-detail-images.single {
-            grid-template-columns: 1fr;
-        }
-
-        .tweet-detail-images.double {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .tweet-detail-images.multiple {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .tweet-detail-images img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        .tweet-detail-text-section {
-            padding: 1.5rem;
-        }
-
-        .tweet-detail-text {
-            color: var(--foreground);
-            font-size: 1rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-            margin-bottom: 0.5rem;
-        }
-
-        .tweet-detail-stat {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.85rem;
-        }
-
-        .tweet-detail-stat svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .tweet-detail-stat.likes {
-            color: var(--accent);
-        }
-
-        .tweet-detail-stat.replies {
-            color: #1da1f2;
-        }
-
-        .tweet-detail-stat.retweets {
-            color: #17bf63;
-        }
-
-        .tweet-detail-time {
-            color: var(--muted-foreground);
-            font-size: 0.85rem;
-            font-family: 'IBM Plex Mono', monospace;
-            margin-top: 1rem;
-        }
-
-        .tweet-detail-footer {
-            padding: 1rem 1.25rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            background: var(--muted);
-            flex-wrap: wrap;
-        }
-
-        .tweet-detail-footer-stats {
-            display: flex;
-            gap: 1.5rem;
-            flex: 1;
-            min-width: fit-content;
-        }
-
-        .tweet-detail-footer-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-left: auto;
-        }
-
-        .tweet-detail-action-btn {
-            padding: 0.65rem 1rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: var(--background);
-            color: var(--foreground);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            white-space: nowrap;
-        }
-
-        .tweet-detail-action-btn:hover {
-            background: var(--muted);
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .tweet-detail-action-btn svg {
-            width: 16px;
-            height: 16px;
-        }
+        /* Tweet Detail Modal styles moved to tweet-detail-modal.css */
 
         .image-card-actions {
             position: absolute;
@@ -1295,9 +1021,9 @@
                     </label>
                 </div>
                 <div class="preview-mode-toggle">
-                    <input type="radio" name="previewMode" id="modeStandard" value="standard" checked>
+                    <input type="radio" name="previewMode" id="modeStandard" value="standard">
                     <label for="modeStandard">Tweets</label>
-                    <input type="radio" name="previewMode" id="modeImages" value="images">
+                    <input type="radio" name="previewMode" id="modeImages" value="images" checked>
                     <label for="modeImages">Images</label>
                 </div>
                 <div class="date-filter" id="dateFilter" style="display: none;">
@@ -1439,10 +1165,7 @@
         // 全局变量追踪选中的日期
         let selectedDates = new Set();
 
-        // Modal 导航全局变量
-        let currentModalIndex = -1;
-        let visibleCards = [];
-        let modalKeyboardHandler = null;
+        // Modal 导航全局变量已移至 tweet-detail-modal.js
 
         // 从已加载的卡片中收集日期信息并初始化筛选器
         function initializeDateFilterFromCards() {
@@ -2184,375 +1907,87 @@
             });
         });
 
-        // 打开推文详情Modal
-        function openTweetDetail(data, url, index, cards) {
-            const modal = document.getElementById('tweetDetailModal');
-
-            // 保存当前状态
-            currentModalIndex = index;
-            visibleCards = cards;
-
-            // 填充内容
-            updateModalContent(data, url);
-
-            // 显示Modal
-            modal.classList.add('show');
-            document.body.style.overflow = 'hidden';
-
-            // 移除旧的键盘事件监听器
-            if (modalKeyboardHandler) {
-                document.removeEventListener('keydown', modalKeyboardHandler);
-            }
-
-            // 添加键盘事件监听器
-            modalKeyboardHandler = (e) => {
-                // 忽略在输入框中的按键
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    return;
-                }
-
-                switch(e.key) {
-                    case 'Escape':
-                        closeTweetDetail();
-                        break;
-                    case ' ':
-                        e.preventDefault();
-                        toggleCurrentTweetSelection();
-                        break;
-                    case 'ArrowLeft':
-                        e.preventDefault();
-                        navigateToTweet(-1);
-                        break;
-                    case 'ArrowRight':
-                        e.preventDefault();
-                        navigateToTweet(1);
-                        break;
-                    case 'c':
-                    case 'C':
-                        e.preventDefault();
-                        copyCurrentTweetLink();
-                        break;
-                    case 'Enter':
-                        e.preventDefault();
-                        openCurrentTweet();
-                        break;
-                }
-            };
-
-            document.addEventListener('keydown', modalKeyboardHandler);
-
-            // 点击背景关闭
-            modal.onclick = (e) => {
-                if (e.target === modal) {
-                    closeTweetDetail();
-                }
-            };
-        }
-
-        // 更新 Modal 内容
-        function updateModalContent(data, url) {
-            // 填充用户信息
-            document.getElementById('modalAvatar').src = data.user_profile_image_url || '';
-            document.getElementById('modalName').textContent = data.user_name || 'Unknown';
-            document.getElementById('modalUsername').textContent = `@${data.user_screen_name || 'unknown'}`;
-
-            // 更新位置指示
-            const positionEl = document.getElementById('modalPosition');
-            positionEl.textContent = `${currentModalIndex + 1} / ${visibleCards.length}`;
-
-            // 更新选中状态
-            updateSelectedIndicator();
-
-            // 填充推文文本
-            document.getElementById('modalText').textContent = data.text || '';
-
-            // 填充媒体（图片和视频）
-            const imagesContainer = document.getElementById('modalImages');
-            imagesContainer.innerHTML = '';
-            if (data.media_extended && data.media_extended.length > 0) {
-                // 获取所有媒体（图片和视频）
-                const mediaItems = data.media_extended.filter(m => m.type === 'image' || m.type === 'video');
-                if (mediaItems.length > 0) {
-                    imagesContainer.className = 'tweet-detail-images';
-                    if (mediaItems.length === 1) {
-                        imagesContainer.classList.add('single');
-                    } else if (mediaItems.length === 2) {
-                        imagesContainer.classList.add('double');
-                    } else {
-                        imagesContainer.classList.add('multiple');
-                    }
-
-                    mediaItems.forEach(item => {
-                        if (item.type === 'image') {
-                            // 渲染图片
-                            const imgEl = document.createElement('img');
-                            imgEl.src = item.url;
-                            imgEl.alt = 'Tweet image';
-                            imagesContainer.appendChild(imgEl);
-                        } else if (item.type === 'video') {
-                            // 渲染视频
-                            const videoEl = document.createElement('video');
-                            videoEl.controls = true;
-                            videoEl.preload = 'metadata';
-                            videoEl.style.width = '100%';
-                            videoEl.style.height = 'auto';
-                            videoEl.style.display = 'block';
-                            videoEl.style.backgroundColor = '#000';
-
-                            // 设置 poster（缩略图）
-                            if (item.thumbnail_url) {
-                                videoEl.poster = item.thumbnail_url;
-                            }
-
-                            // 设置视频源
-                            if (item.url) {
-                                videoEl.src = item.url;
-                            }
-
-                            imagesContainer.appendChild(videoEl);
-                        }
-                    });
-                }
-            } else if (data.mediaURLs && data.mediaURLs.length > 0) {
-                imagesContainer.className = 'tweet-detail-images single';
-                data.mediaURLs.forEach(imgUrl => {
-                    const imgEl = document.createElement('img');
-                    imgEl.src = imgUrl;
-                    imgEl.alt = 'Tweet image';
-                    imagesContainer.appendChild(imgEl);
-                });
-            }
-
-            // 填充互动数据
-            document.getElementById('modalLikes').textContent = data.likes || 0;
-            document.getElementById('modalRetweets').textContent = data.retweets || 0;
-            document.getElementById('modalReplies').textContent = data.replies || 0;
-
-            // 填充时间
-            if (data.date) {
-                const date = new Date(data.date);
-                const timeStr = date.toLocaleString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-                document.getElementById('modalTime').textContent = timeStr;
-            }
-
-            // 设置操作按钮
-            document.getElementById('modalOpenBtn').href = url;
-            document.getElementById('modalCopyBtn').onclick = async () => {
-                try {
-                    await navigator.clipboard.writeText(url);
-                    const btn = document.getElementById('modalCopyBtn');
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 已复制';
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                    }, 2000);
-                } catch (err) {
-                    console.error('Copy failed:', err);
-                }
-            };
-        }
-
-        // 更新选中状态指示器
-        function updateSelectedIndicator() {
-            const indicator = document.getElementById('modalSelectedIndicator');
-            const currentCard = visibleCards[currentModalIndex];
-            if (!currentCard) return;
-
-            const checkbox = currentCard.querySelector('.tweet-check-input');
-            if (checkbox && checkbox.checked) {
-                indicator.classList.add('selected');
-            } else {
-                indicator.classList.remove('selected');
-            }
-        }
-
-        // 切换当前推文的选中状态
-        function toggleCurrentTweetSelection() {
-            const currentCard = visibleCards[currentModalIndex];
-            if (!currentCard) return;
-
-            const checkbox = currentCard.querySelector('.tweet-check-input');
-            if (!checkbox) return;
-
-            checkbox.checked = !checkbox.checked;
-            toggleItemStyle(checkbox);
-            updateSelectedIndicator();
-        }
-
-        // 导航到上一张/下一张
-        function navigateToTweet(direction) {
-            const newIndex = currentModalIndex + direction;
-
-            // 检查边界
-            if (newIndex < 0 || newIndex >= visibleCards.length) {
-                return; // 到达边界，停止
-            }
-
-            // 更新索引
-            currentModalIndex = newIndex;
-
-            // 获取新卡片的数据
-            const newCard = visibleCards[currentModalIndex];
-            if (!newCard || !newCard.dataset.tweetData) return;
-
-            try {
-                const data = JSON.parse(newCard.dataset.tweetData);
-                const url = newCard.querySelector('.tweet-check-input').value;
-                updateModalContent(data, url);
-            } catch (err) {
-                console.error('Failed to navigate to tweet:', err);
-            }
-        }
-
-        // 复制当前推文链接
-        async function copyCurrentTweetLink() {
-            const currentCard = visibleCards[currentModalIndex];
-            if (!currentCard) return;
-
-            const checkbox = currentCard.querySelector('.tweet-check-input');
-            if (!checkbox) return;
-
-            const url = checkbox.value;
-
-            try {
-                await navigator.clipboard.writeText(url);
-
-                // 在Modal内显示临时提示
-                const modal = document.getElementById('tweetDetailModal');
-                const toast = document.createElement('div');
-                toast.style.cssText = `
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    background: var(--accent);
-                    color: var(--accent-foreground);
-                    padding: 1rem 2rem;
-                    border-radius: 8px;
-                    font-family: 'IBM Plex Mono', monospace;
-                    font-size: 0.9rem;
-                    z-index: 10000;
-                    box-shadow: var(--shadow-accent);
-                    animation: fadeIn 0.2s ease;
-                `;
-                toast.textContent = '✓ 链接已复制';
-                document.body.appendChild(toast);
-
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    toast.style.transition = 'opacity 0.3s ease';
-                    setTimeout(() => toast.remove(), 300);
-                }, 1500);
-            } catch (err) {
-                console.error('Copy failed:', err);
-            }
-        }
-
-        // 打开当前推文
-        function openCurrentTweet() {
-            const currentCard = visibleCards[currentModalIndex];
-            if (!currentCard) return;
-
-            const checkbox = currentCard.querySelector('.tweet-check-input');
-            if (!checkbox) return;
-
-            const url = checkbox.value;
-            window.open(url, '_blank', 'noopener');
-        }
-
-        // 关闭推文详情Modal
-        function closeTweetDetail() {
-            const modal = document.getElementById('tweetDetailModal');
-            modal.classList.remove('show');
-            document.body.style.overflow = '';
-
-            // 移除键盘事件监听器
-            if (modalKeyboardHandler) {
-                document.removeEventListener('keydown', modalKeyboardHandler);
-                modalKeyboardHandler = null;
-            }
-
-            // 清理状态
-            currentModalIndex = -1;
-            visibleCards = [];
-        }
+        // 推文详情Modal相关函数已移至 tweet-detail-modal.js
     </script>
+    <!-- Tweet Detail Modal Component Script -->
+    <script src="tweet-detail-modal.js"></script>
     <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
     <!-- Tweet Detail Modal -->
     <div class="tweet-detail-modal" id="tweetDetailModal">
-        <div class="tweet-detail-content" onclick="event.stopPropagation()">
-            <div class="tweet-detail-header">
-                <div class="tweet-detail-user">
-                    <img class="tweet-detail-avatar" id="modalAvatar" src="" alt="Avatar">
-                    <div class="tweet-detail-user-info">
-                        <div class="tweet-detail-name" id="modalName"></div>
-                        <div class="tweet-detail-username" id="modalUsername"></div>
+        <div class="tweet-detail-main-container">
+            <!-- 主卡片 -->
+            <div class="tweet-detail-content" id="mainCard">
+                <div class="tweet-detail-header">
+                    <div class="tweet-detail-user">
+                        <img class="tweet-detail-avatar" id="modalAvatar" src="" alt="Avatar">
+                        <div class="tweet-detail-user-info">
+                            <div class="tweet-detail-name" id="modalName"></div>
+                            <div class="tweet-detail-username" id="modalUsername"></div>
+                        </div>
                     </div>
-                </div>
-                <div class="tweet-detail-position" id="modalPosition">1 / 1</div>
-                <div class="tweet-detail-selected-indicator" id="modalSelectedIndicator">
-                    <svg viewBox="0 0 24 24">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                </div>
-                <button class="tweet-detail-close" onclick="closeTweetDetail()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <div class="tweet-detail-body">
-                <div class="tweet-detail-images" id="modalImages"></div>
-                <div class="tweet-detail-text-section">
-                    <div class="tweet-detail-text" id="modalText"></div>
-                    <div class="tweet-detail-time" id="modalTime"></div>
-                </div>
-            </div>
-            <div class="tweet-detail-footer">
-                <div class="tweet-detail-footer-stats">
-                    <div class="tweet-detail-stat likes">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    <div class="tweet-detail-position" id="modalPosition">1 / 1</div>
+                    <div class="tweet-detail-selected-indicator" id="modalSelectedIndicator">
+                        <svg viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                        <span id="modalLikes">0</span>
                     </div>
-                    <div class="tweet-detail-stat retweets">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.77 15.67a.749.749 0 0 0-1.06 0l-2.22 2.22V7.65a3.755 3.755 0 0 0-3.75-3.75h-5.85a.75.75 0 0 0 0 1.5h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22a.749.749 0 1 0-1.06 1.06l3.5 3.5a.747.747 0 0 0 1.06 0l3.5-3.5a.749.749 0 0 0 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22a.752.752 0 0 0 1.062 0 .749.749 0 0 0 0-1.06l-3.5-3.5a.747.747 0 0 0-1.06 0l-3.5 3.5a.749.749 0 1 0 1.06 1.06l2.22-2.22V16.7a3.755 3.755 0 0 0 3.75 3.75h5.85a.75.75 0 0 0 0-1.5z"></path>
-                        </svg>
-                        <span id="modalRetweets">0</span>
-                    </div>
-                    <div class="tweet-detail-stat replies">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"></path>
-                        </svg>
-                        <span id="modalReplies">0</span>
-                    </div>
-                </div>
-                <div class="tweet-detail-footer-actions">
-                    <button class="tweet-detail-action-btn" id="modalCopyBtn">
+                    <button class="tweet-detail-close" onclick="closeTweetDetail()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
-                        复制链接
                     </button>
-                    <a class="tweet-detail-action-btn" id="modalOpenBtn" target="_blank" rel="noopener">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"></path>
-                        </svg>
-                        打开原推文
-                    </a>
                 </div>
+                <div class="tweet-detail-body">
+                    <div class="tweet-detail-images" id="modalImages"></div>
+                    <div class="tweet-detail-text-section">
+                        <div class="tweet-detail-text" id="modalText"></div>
+                        <div class="tweet-detail-time" id="modalTime"></div>
+                    </div>
+                </div>
+                <div class="tweet-detail-footer">
+                    <div class="tweet-detail-footer-stats">
+                        <div class="tweet-detail-stat likes">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                            <span id="modalLikes">0</span>
+                        </div>
+                        <div class="tweet-detail-stat retweets">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.77 15.67a.749.749 0 0 0-1.06 0l-2.22 2.22V7.65a3.755 3.755 0 0 0-3.75-3.75h-5.85a.75.75 0 0 0 0 1.5h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22a.749.749 0 1 0-1.06 1.06l3.5 3.5a.747.747 0 0 0 1.06 0l3.5-3.5a.749.749 0 0 0 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22a.752.752 0 0 0 1.062 0 .749.749 0 0 0 0-1.06l-3.5-3.5a.747.747 0 0 0-1.06 0l-3.5 3.5a.749.749 0 1 0 1.06 1.06l2.22-2.22V16.7a3.755 3.755 0 0 0 3.75 3.75h5.85a.75.75 0 0 0 0-1.5z"></path>
+                            </svg>
+                            <span id="modalRetweets">0</span>
+                        </div>
+                        <div class="tweet-detail-stat replies">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"></path>
+                            </svg>
+                            <span id="modalReplies">0</span>
+                        </div>
+                    </div>
+                    <div class="tweet-detail-footer-actions">
+                        <button class="tweet-detail-action-btn" id="modalCopyBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            复制链接
+                        </button>
+                        <a class="tweet-detail-action-btn" id="modalOpenBtn" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"></path>
+                            </svg>
+                            打开原推文
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部缩略图条 -->
+            <div class="thumbnail-strip" id="thumbnailStrip">
+                <!-- 缩略图将在这里动态生成 -->
             </div>
         </div>
     </div>

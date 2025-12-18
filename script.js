@@ -69,6 +69,7 @@ window.getApiBaseUrl = getApiBaseUrl;
 window.setApiBaseUrl = setApiBaseUrl;
 window.apiFetch = apiFetch;
 window.buildApiUrl = buildApiUrl;
+window.fetchTweetMedia = fetchTweetMedia; // Expose for modal deduplication
 
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -265,18 +266,17 @@ function createDateSeparator(dateStr) {
 
     // Format date for display
     const date = new Date(dateStr);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const formattedDate = `${year}年${month}月${day}日`;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedDate = `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 
     separator.innerHTML = `
         <div class="date-separator-line"></div>
         <div class="date-separator-text">${formattedDate}</div>
-        <button class="copy-day-btn" title="将此日期内容保存为图片" aria-label="Save as image">
+        <button class="copy-day-btn" title="Download this day's content as image" aria-label="Download as image">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
         </button>
         <div class="date-separator-line"></div>
@@ -288,12 +288,12 @@ function createDateSeparator(dateStr) {
             // Find the parent section which contains both the separator and the content grid
             const targetContainer = separator.closest('.day-section');
             if (targetContainer) {
-                copyDayAsImage(copyBtn, targetContainer, formattedDate);
+                downloadDayAsImage(copyBtn, targetContainer, formattedDate);
             } else {
                 // Fallback for unexpected structure
                 const nextSibling = separator.nextElementSibling;
                 if (nextSibling && (nextSibling.classList.contains('masonry-grid') || nextSibling.classList.contains('image-gallery-grid'))) {
-                    copyDayAsImage(copyBtn, nextSibling, formattedDate);
+                    downloadDayAsImage(copyBtn, nextSibling, formattedDate);
                 }
             }
         });
@@ -304,6 +304,13 @@ function createDateSeparator(dateStr) {
 
 // Render Image Gallery - Optimized for fast rendering
 function renderImageGallery(container, append = false, startIndex = 0, dateLabel = null) {
+    // Cleanup old gallery observer if not appending
+    if (!append && galleryObserverInstance) {
+        galleryObserverInstance.disconnect();
+        galleryObserverInstance = null;
+        console.log('[Gallery] Cleaned up old observer');
+    }
+
     // Create new gallery grid for each day if appending
     let galleryContainer;
 
@@ -357,11 +364,11 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
         daySection.appendChild(galleryContainer);
     }
 
-    const galleryObserver = new IntersectionObserver((entries) => {
+    galleryObserverInstance = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (!entry.isIntersecting) return;
             const wrapper = entry.target;
-            galleryObserver.unobserve(wrapper);
+            galleryObserverInstance.unobserve(wrapper);
 
             const tweetId = wrapper.dataset.tweetId;
             if (!tweetId) return;
@@ -370,8 +377,11 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
             const indicator = wrapper.querySelector('.gallery-multi-indicator');
 
             fetchTweetMedia(tweetId)
-                .then(images => {
+                .then(result => {
                     if (!placeholder) return;
+
+                    // Extract images from result (supports both old array format and new object format)
+                    const images = result?.images || result || [];
 
                     if (!images || images.length === 0) {
                         placeholder.innerHTML = '<div class="gallery-empty">No images found</div>';
@@ -400,6 +410,14 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                     }).join('');
 
                     placeholder.innerHTML = imagesHTML;
+
+                    // Sync data to dataset so modal can use it instantly without re-fetching
+                    if (result && result.fullData) {
+                        wrapper.dataset.tweetData = JSON.stringify(result.fullData);
+                        wrapper.dataset.cachedMedia = JSON.stringify(images);
+                        delete wrapper.dataset.loading;
+                        console.log('[Gallery] Data synced to wrapper for tweetId:', tweetId);
+                    }
 
                     // 为每张图片添加加载完成后的淡入动画
                     const imgElements = placeholder.querySelectorAll('img');
@@ -452,6 +470,20 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
             if (tweetId) {
                 wrapper.dataset.tweetId = tweetId;
                 wrapper.dataset.tweetIndex = tweetIndex;
+                wrapper.dataset.tweetUrl = url; // Store URL for modal navigation
+                wrapper.dataset.loading = 'true'; // Mark for modal loading logic
+
+                // Check for cached media to speed up modal thumbnails
+                const cached = tweetMediaCache.get(tweetId);
+                if (cached && (cached.images || cached.data)) {
+                    if (cached.images) {
+                        wrapper.dataset.cachedMedia = JSON.stringify(cached.images);
+                    }
+                    if (cached.data) {
+                        wrapper.dataset.tweetData = JSON.stringify(cached.data);
+                        delete wrapper.dataset.loading;
+                    }
+                }
             }
 
             wrapper.innerHTML = `
@@ -497,9 +529,15 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
             const thumb = wrapper.querySelector('.gallery-thumb');
             if (thumb) {
                 thumb.addEventListener('click', () => {
-                    if (tweetId) {
+                    console.log('[Gallery Click] Clicked on gallery item, tweetId:', tweetId, 'tweetIndex:', tweetIndex);
+                    if (tweetId && typeof openTweetDetail === 'function') {
+                        console.log('[Gallery Click] Opening gallery tweet detail...');
+                        openGalleryTweetDetail(tweetId, url, tweetIndex);
+                    } else if (tweetId) {
+                        console.log('[Gallery Click] Fallback to image viewer');
                         openImageViewer(tweetId, url, tweetIndex);
                     } else {
+                        console.log('[Gallery Click] Opening in new tab');
                         window.open(url, '_blank');
                     }
                 });
@@ -518,7 +556,7 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
             }
 
             if (tweetId) {
-                galleryObserver.observe(wrapper);
+                galleryObserverInstance.observe(wrapper);
             } else {
                 const placeholder = wrapper.querySelector('.gallery-thumb-placeholder');
                 if (placeholder) {
@@ -553,12 +591,16 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
 }
 
 function fetchTweetMedia(tweetId) {
-    if (!tweetId) return Promise.resolve([]);
+    if (!tweetId) return Promise.resolve({ images: [], fullData: null });
 
     const cached = tweetMediaCache.get(tweetId);
     if (cached) {
-        if (cached.images) {
-            return Promise.resolve(cached.images);
+        if (cached.data) {
+            // Return both full data and images
+            return Promise.resolve({
+                images: cached.images,
+                fullData: cached.data
+            });
         }
         if (cached.promise) {
             return cached.promise;
@@ -574,12 +616,23 @@ function fetchTweetMedia(tweetId) {
         })
         .then(data => {
             const images = extractImageUrlsFromTweetInfo(data);
-            tweetMediaCache.set(tweetId, { images });
-            return images;
+            // Only update cache if our promise is still the current one (avoid race condition)
+            const currentCache = tweetMediaCache.get(tweetId);
+            if (currentCache && currentCache.promise === promise) {
+                tweetMediaCache.set(tweetId, { images, data });
+            }
+            return {
+                images,
+                fullData: data
+            };
         })
         .catch(error => {
             console.error('Error fetching tweet media:', error);
-            tweetMediaCache.delete(tweetId);
+            // Only delete if our promise is still the current one (avoid race condition)
+            const currentCache = tweetMediaCache.get(tweetId);
+            if (currentCache && currentCache.promise === promise) {
+                tweetMediaCache.delete(tweetId);
+            }
             throw error;
         });
 
@@ -685,6 +738,135 @@ function ensureImageViewer() {
     return imageViewerEl;
 }
 
+// ============================================
+// Gallery Tweet Detail Modal (使用新的模态框组件)
+// ============================================
+
+// 为 Gallery 模式提供 toggleItemStyle 的存根函数
+// 在 Gallery 视图中，我们不需要真正的样式切换，因为所有卡片始终选中
+window.toggleItemStyle = function (checkbox) {
+    // Gallery 模式下的空实现 - 所有卡片始终选中
+    console.log('[Gallery] toggleItemStyle called for:', checkbox?.value);
+};
+
+async function openGalleryTweetDetail(tweetId, url, clickedIndex) {
+    console.log('[Gallery Modal] Opening detail for tweetId:', tweetId, 'index:', clickedIndex);
+
+    try {
+        // Get all Gallery cards
+        const allGalleryItems = Array.from(document.querySelectorAll('.gallery-item'));
+        console.log('[Gallery Modal] Found', allGalleryItems.length, 'gallery items');
+
+        if (allGalleryItems.length === 0) {
+            console.error('[Gallery Modal] No cards found');
+            throw new Error('No cards to display');
+        }
+
+        // Find the clicked card index (using tweetIndex dataset or matching tweetId)
+        const finalIndex = allGalleryItems.findIndex(item =>
+            item.dataset.tweetId === tweetId || parseInt(item.dataset.tweetIndex) === clickedIndex
+        );
+
+        const indexToOpen = finalIndex >= 0 ? finalIndex : 0;
+        const clickedCard = allGalleryItems[indexToOpen];
+
+        // Ensure we have some initial data for the display
+        let initialData = { user_name: 'Loading...' };
+        if (clickedCard.dataset.tweetData) {
+            try {
+                initialData = JSON.parse(clickedCard.dataset.tweetData);
+            } catch (e) { }
+        } else {
+            // Check cache
+            const cached = tweetMediaCache.get(tweetId);
+            if (cached && cached.data) {
+                initialData = cached.data;
+                clickedCard.dataset.tweetData = JSON.stringify(cached.data);
+            }
+        }
+
+        console.log('[Gallery Modal] Calling openTweetDetail directly with index:', indexToOpen);
+
+        // Directly call openTweetDetail (now globally available)
+        if (typeof openTweetDetail === 'function') {
+            openTweetDetail(initialData, url, indexToOpen, allGalleryItems);
+        } else {
+            console.error('[Gallery Modal] openTweetDetail not found!');
+            throw new Error('Modal component missing');
+        }
+
+        // Preload adjacent cards in background
+        preloadAdjacentCards(allGalleryItems, indexToOpen);
+
+    } catch (error) {
+        console.error('[Gallery Modal] Error opening detail:', error);
+        showToast('Failed to load tweet details. Using fallback...', 'warning');
+        openImageViewer(tweetId, url, clickedIndex);
+    }
+}
+
+// Preload adjacent cards for smoother navigation
+function preloadAdjacentCards(cards, currentIndex, range = 3) {
+    const indices = [];
+
+    // Preload cards before and after current card
+    for (let i = 1; i <= range; i++) {
+        if (currentIndex - i >= 0) indices.push(currentIndex - i);
+        if (currentIndex + i < cards.length) indices.push(currentIndex + i);
+    }
+
+    // Load in background with concurrency control (max 2 concurrent)
+    const MAX_CONCURRENT_PRELOADS = 2;
+
+    const loadCard = async (index) => {
+        const card = cards[index];
+        // Skip if already loaded or no loading flag
+        if (!card || !card.dataset.loading) return;
+
+        const itemTweetId = card.dataset.tweetId;
+
+        // Check cache first
+        const cachedData = tweetMediaCache.get(itemTweetId);
+        if (cachedData && cachedData.data) {
+            // Use cached data
+            card.dataset.tweetData = JSON.stringify(cachedData.data);
+            delete card.dataset.loading;
+            console.log('[Gallery Modal] Preloaded card', index, 'from cache, tweetId:', itemTweetId);
+            return;
+        }
+
+        // Load from API if not cached using apiFetch
+        try {
+            const response = await apiFetch(`/api/tweet_info?id=${itemTweetId}`);
+            if (!response.ok) throw new Error('Failed to fetch');
+            const tweetData = await response.json();
+
+            card.dataset.tweetData = JSON.stringify(tweetData);
+            delete card.dataset.loading;
+            // Update cache
+            tweetMediaCache.set(itemTweetId, {
+                images: extractImageUrlsFromTweetInfo(tweetData),
+                data: tweetData
+            });
+            console.log('[Gallery Modal] Preloaded card', index, 'from API, tweetId:', itemTweetId);
+        } catch (error) {
+            console.warn('[Gallery Modal] Failed to preload card', index, error);
+        }
+    };
+
+    // Process in batches to limit concurrency
+    (async () => {
+        for (let i = 0; i < indices.length; i += MAX_CONCURRENT_PRELOADS) {
+            const batch = indices.slice(i, i + MAX_CONCURRENT_PRELOADS);
+            await Promise.allSettled(batch.map(loadCard));
+        }
+    })();
+}
+
+// ============================================
+// Image Viewer (Original simple image viewer)
+// ============================================
+
 function openImageViewer(tweetId, tweetUrl, tweetIndex = -1) {
     const viewer = ensureImageViewer();
     const placeholder = viewer.querySelector('.viewer-placeholder');
@@ -715,7 +897,9 @@ function openImageViewer(tweetId, tweetUrl, tweetIndex = -1) {
     document.body.classList.add('viewer-open');
 
     fetchTweetMedia(tweetId)
-        .then(images => {
+        .then(result => {
+            // Extract images from result (supports both old array format and new object format)
+            const images = result?.images || result || [];
             imageViewerState.images = images;
             if (!imageViewerEl || !imageViewerEl.classList.contains('visible')) {
                 return;
@@ -1019,7 +1203,7 @@ function loadTweet(url, container, index) {
     const tweetId = extractTweetId(url);
 
     if (!tweetId) {
-        container.innerHTML = '<p class="tweet-error">推文加载失败，刷新页面试试</p>';
+        container.innerHTML = '<p class="tweet-error">Failed to load tweet, please refresh</p>';
         container.classList.add('loaded');
         container.classList.remove('loading');
         return;
@@ -1027,6 +1211,23 @@ function loadTweet(url, container, index) {
 
     const target = document.getElementById(`tweet-target-${index}`);
     const loading = container.querySelector('.tweet-loading');
+
+    // Check if Twitter script failed to load (e.g. blocked by ad blocker)
+    if (window.twitterScriptFailed) {
+        container.innerHTML = `
+            <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 8px; opacity: 0.7;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+                <p>Tweet blocked by content blocker</p>
+                <p style="font-size: 0.8rem; margin-top: 4px;">Please disable AdBlock to view tweets</p>
+            </div>
+        `;
+        container.classList.add('loaded');
+        container.classList.remove('loading');
+        return;
+    }
 
     const renderTweet = () => {
         window.twttr.widgets.createTweet(
@@ -1051,7 +1252,7 @@ function loadTweet(url, container, index) {
                 // Ensure proper alignment after loading
                 container.parentElement.style.alignSelf = 'flex-start';
             } else {
-                container.innerHTML = '<p class="tweet-error">推文加载失败，刷新页面试试</p>';
+                container.innerHTML = '<p class="tweet-error">Failed to load tweet, please refresh</p>';
                 container.classList.add('loaded');
                 container.classList.remove('loading');
             }
@@ -1074,7 +1275,7 @@ function loadTweet(url, container, index) {
         setTimeout(() => {
             clearInterval(checkTwitter);
             if (!container.classList.contains('loaded') && container.querySelector('.tweet-loading')) {
-                container.innerHTML = '<p class="tweet-error">加载超时，刷新页面试试</p>';
+                container.innerHTML = '<p class="tweet-error">Load timeout, please refresh</p>';
                 container.classList.add('loaded');
                 container.classList.remove('loading');
             }
@@ -1087,7 +1288,59 @@ const paramDate = urlParams.get('date');
 let currentDate = (paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) ? paramDate : null; // Will be set to latest date if null
 const tweetUrls = [];
 let availableDates = [];
-const tweetMediaCache = new Map();
+
+// LRU Cache implementation for tweet media
+class LRUCache {
+    constructor(maxSize = 150) {
+        this.maxSize = maxSize;
+        this.cache = new Map();
+    }
+
+    get(key) {
+        if (!this.cache.has(key)) return undefined;
+        // Move to end (most recently used)
+        const value = this.cache.get(key);
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    set(key, value) {
+        // Delete if exists (to re-insert at end)
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        }
+        // Check size and evict oldest if needed
+        else if (this.cache.size >= this.maxSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+            console.log('[LRU Cache] Evicted oldest entry:', firstKey);
+        }
+        this.cache.set(key, value);
+    }
+
+    has(key) {
+        return this.cache.has(key);
+    }
+
+    delete(key) {
+        return this.cache.delete(key);
+    }
+
+    clear() {
+        this.cache.clear();
+    }
+
+    get size() {
+        return this.cache.size;
+    }
+}
+
+const tweetMediaCache = new LRUCache(150);
+
+// Gallery observer instance for cleanup
+let galleryObserverInstance = null;
+
 let imageViewerEl = null;
 const imageViewerState = {
     tweetId: null,
@@ -1097,11 +1350,16 @@ const imageViewerState = {
     index: 0
 };
 
+// Expose cache and utility function to window for modal access
+window.tweetMediaCache = tweetMediaCache;
+window.extractImageUrlsFromTweetInfo = extractImageUrlsFromTweetInfo;
+
 // Infinite scroll state
 let currentDateIndex = 0; // Index in availableDates array
 let isLoadingMore = false;
 let hasMoreDates = true;
 let loadedDates = new Set(); // Track loaded dates to avoid duplicates
+window.preloadSessionId = 0; // Control background loading chain
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -1170,39 +1428,279 @@ function setupInfiniteScroll() {
 
             // Load more when within 2500px of bottom (提前预加载，避免用户等待)
             if (scrollHeight - (scrollTop + clientHeight) < 2500) {
-                loadNextDate();
+                // Preload up to 3 days ahead to satisfy user expectation of smooth browsing
+                loadNextDate(3);
             }
         }, 150); // 减少debounce时间，更快响应
     });
 }
 
-// Load next date's content
-function loadNextDate() {
+/**
+ * Load next date's content
+ * @param {number} lookaheadCount - How many additional days to load sequentially (default 1)
+ * @param {number} sessionId - Current background load session ID
+ */
+function loadNextDate(lookaheadCount = 1, sessionId = null) {
+    // If sessionId is provided, ONLY continue if it matches current global ID
+    if (sessionId !== null && sessionId !== window.preloadSessionId) {
+        console.log('[Background Load] Session expired, stopping chain');
+        return;
+    }
+
     // Check if already loading or no more dates
-    if (isLoadingMore || !hasMoreDates) return;
+    if (isLoadingMore || !hasMoreDates) {
+        // If we are already loading but still have lookahead budget, we'll be triggered again by loadContentForDate's completion
+        return;
+    }
 
     // Find next date that hasn't been loaded
     currentDateIndex++;
 
     if (currentDateIndex >= availableDates.length) {
         hasMoreDates = false;
+        console.log('[Infinite Scroll] No more dates available');
+        showEndOfContentMessage();
         return;
     }
 
     const nextDate = availableDates[currentDateIndex].date;
+    console.log('[Infinite Scroll] Loading next date:', nextDate, 'index:', currentDateIndex, '/', availableDates.length, 'Lookahead remaining:', lookaheadCount - 1);
 
     // Check if already loaded
     if (loadedDates.has(nextDate)) {
-        // Try next date
-        loadNextDate();
+        console.log('[Infinite Scroll] Date already loaded, trying next...');
+        // Try next date, preserving lookahead count
+        loadNextDate(lookaheadCount);
         return;
     }
 
     isLoadingMore = true;
     loadedDates.add(nextDate);
 
+    // Show loading indicator
+    showLoadingIndicator();
+
     // Load content for next date
-    loadContentForDate(nextDate, true); // true = append mode
+    loadContentForDate(nextDate, true, () => {
+        // Callback after date content is loaded and elements are created
+        if (lookaheadCount > 1 && hasMoreDates) {
+            // Sequential preload: delay slightly to avoid UI stutter
+            setTimeout(() => {
+                loadNextDate(lookaheadCount - 1, sessionId);
+            }, 500);
+        }
+    });
+}
+
+// Load next date for modal navigation - returns a Promise with new cards
+let currentModalLoadPromise = null;
+
+window.loadNextDateForModal = function () {
+    // Return existing promise if already loading
+    if (currentModalLoadPromise) {
+        console.log('[Modal Navigation] Already loading, joining existing request');
+        return currentModalLoadPromise;
+    }
+
+    currentModalLoadPromise = new Promise((resolve, reject) => {
+        console.log('[Modal Navigation] Attempting to load next date...');
+
+        // Check if we can load more
+        if (isLoadingMore) {
+            // This happens if infinite scroll triggered it but we don't have the promise handle
+            // We'll trust the infinite scroll logic to eventually populate the DOM
+            // and we act as a secondary listener
+            console.log('[Modal Navigation] Infinite scroll already loading, attaching observer');
+        } else if (!hasMoreDates) {
+            console.log('[Modal Navigation] No more dates available');
+            reject(new Error('No more dates'));
+            currentModalLoadPromise = null;
+            return;
+        } else {
+            // Check next date index
+            const nextIndex = currentDateIndex + 1;
+            if (nextIndex >= availableDates.length) {
+                hasMoreDates = false;
+                console.log('[Modal Navigation] Reached end of available dates');
+                reject(new Error('No more dates'));
+                currentModalLoadPromise = null;
+                return;
+            }
+
+            const nextDate = availableDates[nextIndex].date;
+
+            // Check if already loaded
+            if (loadedDates.has(nextDate)) {
+                console.log('[Modal Navigation] Date already loaded, collecting new cards');
+                const newCards = collectNewCards();
+                resolve(newCards);
+                currentModalLoadPromise = null;
+                return;
+            }
+
+            // Trigger the load
+            currentDateIndex = nextIndex;
+            isLoadingMore = true;
+            loadedDates.add(nextDate);
+            console.log('[Modal Navigation] Loading new date:', nextDate);
+            loadContentForDate(nextDate, true);
+        }
+
+        // Set up observer to watch for new cards
+        const contentList = document.getElementById('contentList');
+        if (!contentList) {
+            reject(new Error('Content list not found'));
+            currentModalLoadPromise = null;
+            return;
+        }
+
+        // Count current cards before loading
+        const currentView = localStorage.getItem('viewMode') || 'list';
+        const cardSelector = currentView === 'gallery' ? '.gallery-item' : '.masonry-item';
+        const currentCardCount = contentList.querySelectorAll(cardSelector).length;
+
+        console.log('[Modal Navigation] Current card count:', currentCardCount);
+
+        // Set up mutation observer to detect new cards
+        const observer = new MutationObserver((mutations) => {
+            const newCardCount = contentList.querySelectorAll(cardSelector).length;
+
+            if (newCardCount > currentCardCount) {
+                console.log('[Modal Navigation] New cards detected (Count:', newCardCount, '), collecting...');
+                observer.disconnect();
+
+                // Small delay to ensure DOM is stable, but removed the 2s artificial delay
+                // The modal will handle data fetching individually
+                requestAnimationFrame(() => {
+                    const newCards = collectNewCards();
+                    console.log('[Modal Navigation] Collected', newCards.length, 'new cards');
+                    resolve(newCards);
+                    currentModalLoadPromise = null;
+                });
+            }
+        });
+
+        observer.observe(contentList, {
+            childList: true,
+            subtree: true
+        });
+
+        // Set a timeout to prevent hanging
+        setTimeout(() => {
+            if (currentModalLoadPromise) { // Only if still pending
+                observer.disconnect();
+                console.log('[Modal Navigation] Timeout waiting for new cards');
+                // Try to resolve anyway, maybe cards appeared but observer missed (unlikely) or just slow
+                const newCards = collectNewCards();
+                if (newCards.length > currentCardCount) {
+                    resolve(newCards);
+                } else {
+                    reject(new Error('Timeout loading new cards'));
+                }
+                currentModalLoadPromise = null;
+            }
+        }, 10000);
+    });
+
+    return currentModalLoadPromise;
+};
+
+// Helper function to collect new gallery cards that weren't in the original set
+function collectNewCards() {
+    const currentView = localStorage.getItem('viewMode') || 'list';
+    if (currentView === 'gallery') {
+        return Array.from(document.querySelectorAll('.gallery-item'));
+    } else {
+        // For list view, we need to create virtual cards like openGalleryTweetDetail does
+        // For now, return empty array as list view doesn't support this feature yet
+        return [];
+    }
+}
+
+// Show loading indicator at bottom
+function showLoadingIndicator() {
+    let indicator = document.getElementById('loadingIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'loadingIndicator';
+        indicator.style.cssText = `
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary, #cccccc);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        `;
+        indicator.innerHTML = `
+            <div style="
+                width: 20px;
+                height: 20px;
+                border: 2px solid rgba(255, 255, 255, 0.2);
+                border-top-color: rgba(255, 255, 255, 0.8);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+            "></div>
+            <span>Loading more content...</span>
+        `;
+
+        // Add animation keyframes if not already present
+        if (!document.getElementById('spinKeyframes')) {
+            const style = document.createElement('style');
+            style.id = 'spinKeyframes';
+            style.textContent = `
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const contentList = document.getElementById('contentList');
+        if (contentList) {
+            contentList.parentElement.appendChild(indicator);
+        }
+    }
+    indicator.style.display = 'flex';
+}
+
+// Hide loading indicator
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+// Show end of content message
+function showEndOfContentMessage() {
+    let message = document.getElementById('endOfContentMessage');
+    if (!message) {
+        message = document.createElement('div');
+        message.id = 'endOfContentMessage';
+        message.style.cssText = `
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted, #999999);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+            margin-top: 2rem;
+        `;
+        message.innerHTML = `
+            <svg style="width: 32px; height: 32px; margin: 0 auto 0.75rem; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>All content loaded</div>
+        `;
+
+        const contentList = document.getElementById('contentList');
+        if (contentList) {
+            contentList.parentElement.appendChild(message);
+        }
+    }
+    message.style.display = 'block';
+    hideLoadingIndicator();
 }
 
 // Sync date tabs to mobile navigation
@@ -1305,9 +1803,29 @@ function loadAvailableDates() {
                 renderDateTabs();
                 selectDateTab(currentDate);
 
-                // Load content for the current date (which is now the latest if it was null)
+                // Find correctly current index in available dates
                 if (currentDate) {
-                    loadContentForDate(currentDate);
+                    const idx = availableDates.findIndex(d => d.date === currentDate);
+                    if (idx !== -1) {
+                        currentDateIndex = idx;
+                        console.log('[Init] Current date index set to:', currentDateIndex);
+                    }
+                }
+
+                // Load content for the current date
+                if (currentDate) {
+                    window.preloadSessionId = Date.now();
+                    const currentSession = window.preloadSessionId;
+
+                    loadContentForDate(currentDate, false, () => {
+                        // After initial date is loaded, start loading everything else in background
+                        console.log('[Init] Initial content loaded, starting sequential background preloading...');
+                        setTimeout(() => {
+                            if (hasMoreDates) {
+                                loadNextDate(availableDates.length, currentSession);
+                            }
+                        }, 2000); // Wait 2s to ensure initial rendering is smooth
+                    });
                 }
             })
             .catch(error => {
@@ -1350,8 +1868,27 @@ function renderDateTabs() {
         tab.addEventListener('click', () => {
             const date = tab.getAttribute('data-date');
             currentDate = date;
+
+            // Cancel previous background loads and start a new one from new date
+            window.preloadSessionId = Date.now();
+            const currentSession = window.preloadSessionId;
+
+            // Sync current index
+            const idx = availableDates.findIndex(d => d.date === date);
+            if (idx !== -1) {
+                currentDateIndex = idx;
+                console.log('[Tabs] Current date index updated to:', currentDateIndex);
+            }
+
             selectDateTab(date);
-            loadContentForDate(date);
+            loadContentForDate(date, false, () => {
+                // Restart sequential preloading from new position
+                setTimeout(() => {
+                    if (currentSession === window.preloadSessionId) { // Verify session still active
+                        loadNextDate(availableDates.length, currentSession);
+                    }
+                }, 2000);
+            });
 
             // Update URL parameter
             const url = new URL(window.location);
@@ -1427,15 +1964,55 @@ function showSourceToast(source) {
     }, 3000);
 }
 
+// Show general toast message
+function showToast(message, type = 'info', duration = 3000) {
+    let toast = document.getElementById('general-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'general-toast';
+        toast.style.position = 'fixed';
+        toast.style.bottom = '20px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.color = 'white';
+        toast.style.padding = '12px 24px';
+        toast.style.borderRadius = '8px';
+        toast.style.fontSize = '14px';
+        toast.style.zIndex = '10000';
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.maxWidth = '80vw';
+        toast.style.textAlign = 'center';
+        toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        document.body.appendChild(toast);
+    }
+
+    // Set background color based on type
+    const colors = {
+        info: 'rgba(0, 122, 255, 0.9)',
+        error: 'rgba(255, 59, 48, 0.9)',
+        warning: 'rgba(255, 149, 0, 0.9)',
+        success: 'rgba(52, 199, 89, 0.9)'
+    };
+    toast.style.backgroundColor = colors[type] || colors.info;
+
+    toast.textContent = message;
+    toast.style.opacity = '1';
+
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+    }, duration);
+}
+
 // Load content for specific date
-function loadContentForDate(date, append = false) {
+function loadContentForDate(date, append = false, callback = null) {
     // First check if we're on the main page
     const contentList = document.getElementById('contentList');
     const emptyState = document.getElementById('emptyState');
 
     if (!contentList) {
         // Not on the main page, so don't proceed
-        return;
+        return Promise.resolve(0);
     }
 
     // Define storage key for this date
@@ -1452,7 +2029,7 @@ function loadContentForDate(date, append = false) {
     const url = `/api/data?date=${encodeURIComponent(date)}`;
     const startIndex = tweetUrls.length; // Save current length for append
 
-    apiFetch(url)
+    return apiFetch(url)
         .then(r => {
             if (!r.ok) {
                 throw new Error(`HTTP error! status: ${r.status}`);
@@ -1481,10 +2058,22 @@ function loadContentForDate(date, append = false) {
                         renderTweetList(contentList, true, startIndex, date);
                     }
                     isLoadingMore = false;
+                    hideLoadingIndicator();
+                    console.log('[Infinite Scroll] Content loaded successfully for', date);
+
+                    // Execute callback for sequential preloading
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
                 } else {
                     // Initial mode: render all content
                     renderContent(false);
                     emptyState.style.display = 'none';
+
+                    // Execute callback for sequential preloading even on initial load
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
                 }
 
                 localStorage.setItem(storageKey, JSON.stringify(urls));
@@ -1494,7 +2083,7 @@ function loadContentForDate(date, append = false) {
                 if (!append) {
                     selectDateTab(date);
                 }
-                return;
+                return reversedUrls.length;
             }
 
             // Try to load from localStorage as fallback
@@ -1516,6 +2105,13 @@ function loadContentForDate(date, append = false) {
                                 renderTweetList(contentList, true, startIndex, date);
                             }
                             isLoadingMore = false;
+                            hideLoadingIndicator();
+                            console.log('[Infinite Scroll] Content loaded from cache (fallback 1) for', date);
+
+                            // Execute callback for sequential preloading
+                            if (typeof callback === 'function') {
+                                callback();
+                            }
                         } else {
                             // Initial mode: render all content
                             renderContent(false);
@@ -1528,7 +2124,7 @@ function loadContentForDate(date, append = false) {
                         if (!append) {
                             selectDateTab(date);
                         }
-                        return;
+                        return reversedUrls.length;
                     }
                 } catch (e) { }
             }
@@ -1539,12 +2135,15 @@ function loadContentForDate(date, append = false) {
                 emptyState.style.display = 'block';
             } else {
                 isLoadingMore = false;
+                hideLoadingIndicator();
+                console.log('[Infinite Scroll] No data available for', date);
             }
 
             // Still update the selected tab even if no content (only when not appending)
             if (!append) {
                 selectDateTab(date);
             }
+            return 0;
         })
         .catch(error => {
             console.error('Error loading content for date:', date, error);
@@ -1567,6 +2166,8 @@ function loadContentForDate(date, append = false) {
                                 renderTweetList(contentList, true, startIndex, date);
                             }
                             isLoadingMore = false;
+                            hideLoadingIndicator();
+                            console.log('[Infinite Scroll] Content loaded from cache (error fallback) for', date);
                         } else {
                             // Initial mode: render all content
                             renderContent(false);
@@ -1579,7 +2180,7 @@ function loadContentForDate(date, append = false) {
                         if (!append) {
                             selectDateTab(date);
                         }
-                        return;
+                        return reversedUrls.length;
                     }
                 } catch (e) { }
             }
@@ -1590,12 +2191,15 @@ function loadContentForDate(date, append = false) {
                 emptyState.style.display = 'none';
             } else {
                 isLoadingMore = false;
+                hideLoadingIndicator();
+                console.log('[Infinite Scroll] Failed to load content for', date);
             }
 
             // Still update the selected tab even if no content (only when not appending)
             if (!append) {
                 selectDateTab(date);
             }
+            return 0;
         });
 }
 
@@ -1664,65 +2268,183 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Generate image from container and copy to clipboard
-function copyDayAsImage(button, container, dateLabel) {
+// Wait for libraries to load
+async function waitForLibraries(timeout = 5000) {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+        if (typeof html2canvas !== 'undefined' && typeof JSZip !== 'undefined') {
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return false;
+}
+
+// Generate image from container and download content as ZIP
+async function downloadDayAsImage(button, container, dateLabel) {
     if (button.classList.contains('generating')) return;
 
+    // UI Feedback Helper
     const originalIcon = button.innerHTML;
+    const updateStatus = (text) => {
+        console.log(`[Download] ${text}`);
+    };
+
     button.classList.add('generating');
 
-    // Check if html2canvas is loaded
-    if (typeof html2canvas === 'undefined') {
-        console.error('html2canvas library not loaded');
+    // Wait for libraries to load
+    updateStatus('Checking libraries...');
+    const librariesLoaded = await waitForLibraries();
+
+    if (!librariesLoaded) {
+        console.error('Required libraries (html2canvas or JSZip) not loaded');
         button.classList.remove('generating');
         button.classList.add('error');
-        setTimeout(() => button.classList.remove('error'), 2000);
+
+        // Show user-friendly error message
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 1.5rem 2rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            max-width: 400px;
+            text-align: center;
+        `;
+        errorMsg.innerHTML = `
+            <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Download Failed</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                Required libraries could not be loaded. Please check your internet connection and try again.
+            </div>
+        `;
+        document.body.appendChild(errorMsg);
+
+        setTimeout(() => {
+            errorMsg.remove();
+            button.classList.remove('error');
+        }, 3000);
         return;
     }
 
-    html2canvas(container, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: getComputedStyle(document.body).backgroundColor,
-        scale: 2, // Higher quality
-        logging: false,
-        onclone: (clonedDoc) => {
-            // Adjust cloned elements if necessary
-            const clonedContainer = clonedDoc.querySelector(`.${container.className.split(' ')[0]}`);
-            if (clonedContainer) {
-                clonedContainer.style.transform = 'none';
-                clonedContainer.style.margin = '20px';
-            }
-        }
-    }).then(canvas => {
-        canvas.toBlob(blob => {
-            if (!blob) {
-                throw new Error('Canvas serialization failed');
-            }
+    try {
+        const zip = new JSZip();
+        // Create a folder for this date
+        // Note: Windows folders don't like colons/slashes in names, dateLabel usually safe (202x年x月x日)
+        const folderName = `NanoBanana-${dateLabel}`;
+        const folder = zip.folder(folderName);
 
-            // Attempt to write to clipboard
-            // Fallback to download if clipboard API fails
-            if (navigator.clipboard && navigator.clipboard.write) {
-                navigator.clipboard.write([
-                    new ClipboardItem({ 'image/png': blob })
-                ]).then(() => {
-                    handleSuccess();
-                }).catch(err => {
-                    console.warn('Clipboard write failed, falling back to download', err);
-                    triggerDownload(canvas, dateLabel);
-                    handleSuccess();
-                });
-            } else {
-                triggerDownload(canvas, dateLabel);
-                handleSuccess();
+        // --- Step 1: Capture Full Screenshot ---
+        updateStatus('Capturing screenshot...');
+        const canvas = await html2canvas(container, {
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: getComputedStyle(document.body).backgroundColor,
+            scale: 2,
+            logging: false,
+            onclone: (clonedDoc) => {
+                const clonedContainer = clonedDoc.querySelector(`.${container.className.split(' ')[0]}`);
+                if (clonedContainer) {
+                    clonedContainer.style.transform = 'none';
+                    clonedContainer.style.margin = '20px';
+                }
             }
-        }, 'image/png');
-    }).catch(err => {
-        console.error('Snapshot failed:', err);
+        });
+
+        // Add screenshot to ZIP
+        const screenshotBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (screenshotBlob) {
+            folder.file(`${folderName}-Overview.png`, screenshotBlob);
+        }
+
+        // --- Step 2: Download Individual Images ---
+        updateStatus('Fetching individual images...');
+
+        // Find all tweet identifiers in this container
+        // Support both Masonry (.tweet-embed-container) and Gallery (.gallery-item)
+        const items = container.querySelectorAll('.tweet-embed-container, .gallery-item');
+        const uniqueTweetIds = new Set();
+
+        items.forEach(item => {
+            const url = item.dataset.tweetUrl || (item.querySelector('.gallery-link-icon')?.href);
+            if (url) {
+                const id = extractTweetId(url);
+                if (id) uniqueTweetIds.add(id);
+            }
+        });
+
+        // Process images (limit concurrency if needed, but for now linear or parallel batch)
+        const tweetIds = Array.from(uniqueTweetIds);
+        let imageCount = 0;
+
+        const downloadPromises = tweetIds.map(async (tweetId) => {
+            try {
+                // Fetch tweet media info (using cache if available from previous logic)
+                const result = await fetchTweetMedia(tweetId);
+                const mediaItems = result?.images || [];
+
+                if (!mediaItems || mediaItems.length === 0) return;
+
+                // Download each media item
+                await Promise.all(mediaItems.map(async (media, index) => {
+                    if (media.type === 'video') return; // Skip videos for now, or fetch thumbnail
+
+                    const imageUrl = media.url;
+                    try {
+                        // Fetch image blob
+                        const response = await fetch(imageUrl);
+                        if (!response.ok) throw new Error('Fetch failed');
+                        const blob = await response.blob();
+
+                        // Determine extension
+                        const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+                        const filename = `tweet_${tweetId}_${index + 1}.${ext}`;
+
+                        folder.file(filename, blob);
+                        imageCount++;
+                    } catch (e) {
+                        // Fallback: If CORS fails (likely), we might need a proxy or skip
+                        console.warn(`Failed to download image: ${imageUrl}`, e);
+                        // Try fetching via internal proxy if your architecture supports it?
+                        // For now, allow failing silently for specific images
+                    }
+                }));
+
+            } catch (err) {
+                console.warn(`Error processing tweet ${tweetId}:`, err);
+            }
+        });
+
+        await Promise.all(downloadPromises);
+
+        // --- Step 3: Generate ZIP and Download ---
+        updateStatus('Zipping...');
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        // Trigger download
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.download = `${folderName}.zip`;
+        link.href = downloadUrl;
+        link.click();
+
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        handleSuccess();
+
+    } catch (err) {
+        console.error('Download workflow failed:', err);
         button.classList.remove('generating');
         button.classList.add('error');
         setTimeout(() => button.classList.remove('error'), 2000);
-    });
+    }
 
     function handleSuccess() {
         button.classList.remove('generating');
@@ -1732,12 +2454,5 @@ function copyDayAsImage(button, container, dateLabel) {
             button.classList.remove('success');
             button.innerHTML = originalIcon;
         }, 2000);
-    }
-
-    function triggerDownload(canvas, label) {
-        const link = document.createElement('a');
-        link.download = `NanoBanana-${label}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
     }
 }

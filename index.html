@@ -9,6 +9,7 @@
         content="Daily curated content about nano banana pro prompt from Twitter, featuring trending discussions and insights">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tweet-detail-modal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -112,20 +113,100 @@
             </div>
         </div>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>Daily Updates</p>
-            <p class="footer-note">
-                <a href="admin.html" target="_blank"
-                    style="color: inherit; text-decoration: none; opacity: 0.5;">Admin</a>
-            </p>
-        </footer>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+        onerror="this.onerror=null; this.src='https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'; console.log('Falling back to unpkg for html2canvas');"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+        onerror="this.onerror=null; this.src='https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'; console.log('Falling back to unpkg for JSZip');"></script>
     <script src="script.js"></script>
+    <script src="tweet-detail-modal.js"></script>
+
+    <!-- Tweet Detail Modal Component -->
+    <div class="tweet-detail-modal" id="tweetDetailModal">
+        <div class="tweet-detail-main-container">
+            <!-- Main Card -->
+            <div class="tweet-detail-content" id="mainCard">
+                <div class="tweet-detail-header">
+                    <div class="tweet-detail-user">
+                        <img class="tweet-detail-avatar" id="modalAvatar" src="" alt="Avatar">
+                        <div class="tweet-detail-user-info">
+                            <div class="tweet-detail-name" id="modalName"></div>
+                            <div class="tweet-detail-username" id="modalUsername"></div>
+                        </div>
+                    </div>
+                    <div class="tweet-detail-position" id="modalPosition">1 / 1</div>
+                    <div class="tweet-detail-selected-indicator" id="modalSelectedIndicator">
+                        <svg viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <button class="tweet-detail-close" onclick="closeTweetDetail()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="tweet-detail-body">
+                    <div class="tweet-detail-images" id="modalImages"></div>
+                    <div class="tweet-detail-text-section">
+                        <div class="tweet-detail-text" id="modalText"></div>
+                        <div class="tweet-detail-time" id="modalTime"></div>
+                    </div>
+                </div>
+                <div class="tweet-detail-footer">
+                    <div class="tweet-detail-footer-stats">
+                        <div class="tweet-detail-stat likes">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
+                                </path>
+                            </svg>
+                            <span id="modalLikes">0</span>
+                        </div>
+                        <div class="tweet-detail-stat retweets">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M23.77 15.67a.749.749 0 0 0-1.06 0l-2.22 2.22V7.65a3.755 3.755 0 0 0-3.75-3.75h-5.85a.75.75 0 0 0 0 1.5h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22a.749.749 0 1 0-1.06 1.06l3.5 3.5a.747.747 0 0 0 1.06 0l3.5-3.5a.749.749 0 0 0 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22a.752.752 0 0 0 1.062 0 .749.749 0 0 0 0-1.06l-3.5-3.5a.747.747 0 0 0-1.06 0l-3.5 3.5a.749.749 0 1 0 1.06 1.06l2.22-2.22V16.7a3.755 3.755 0 0 0 3.75 3.75h5.85a.75.75 0 0 0 0-1.5z">
+                                </path>
+                            </svg>
+                            <span id="modalRetweets">0</span>
+                        </div>
+                        <div class="tweet-detail-stat replies">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z">
+                                </path>
+                            </svg>
+                            <span id="modalReplies">0</span>
+                        </div>
+                    </div>
+                    <div class="tweet-detail-footer-actions">
+                        <button class="tweet-detail-action-btn" id="modalCopyBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            复制链接
+                        </button>
+                        <a class="tweet-detail-action-btn" id="modalOpenBtn" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3">
+                                </path>
+                            </svg>
+                            打开原推文
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="thumbnail-strip" id="thumbnailStrip"></div>
+        </div>
+    </div>
+
     <!-- Twitter Widget Script for Embedded Tweets -->
-    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"
+        onerror="window.twitterScriptFailed=true; console.error('Twitter widgets script failed to load - likely blocked');"></script>
 
     <script>
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };

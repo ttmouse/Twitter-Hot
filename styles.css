@@ -223,14 +223,18 @@ body {
     top: 0;
     left: 0;
     right: 0;
+    height: 64px;
+    /* 固定高度防止加载前后抖动 */
     background: rgba(10, 10, 10, 0.95);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-color);
     z-index: 1000;
-    padding: 0.75rem 0;
+    display: flex;
+    align-items: center;
 }
 
 .top-bar-content {
+    width: 100%;
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem;
@@ -274,7 +278,8 @@ body {
 }
 
 body {
-    padding-top: 4rem;
+    padding-top: 64px;
+    /* 匹配 top-bar 高度 */
 }
 
 /* Header - 移除原来的header样式，因为现在在top bar中 */
