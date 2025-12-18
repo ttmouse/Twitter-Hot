@@ -9,6 +9,13 @@ window.visibleCards = window.visibleCards ?? [];
 window.modalKeyboardHandler = window.modalKeyboardHandler ?? null;
 window.isPreloading = window.isPreloading ?? false;
 
+// Expose updateThumbnail globally for script.js preloading access
+window.updateThumbnail = (index) => {
+    if (typeof updateThumbnail === 'function') {
+        updateThumbnail(index);
+    }
+};
+
 /**
  * Open Tweet Detail Modal
  * @param {Object} data - Tweet data
@@ -220,11 +227,35 @@ function generateThumbnails(startIndex = 0) {
                 thumbnailContent = `<div class="thumbnail-item-placeholder">?</div>`;
             }
         }
-        // Priority 3: Show loading spinner
+        // Priority 3: Check global cache if data exists but not yet on dataset
+        else if (card.dataset.loading === 'true' && typeof window.tweetMediaCache !== 'undefined') {
+            const cached = window.tweetMediaCache.get(card.dataset.tweetId);
+            if (cached && cached.data) {
+                try {
+                    const cardData = cached.data;
+                    card.dataset.tweetData = JSON.stringify(cardData);
+                    delete card.dataset.loading;
+
+                    if (cardData.media_extended && cardData.media_extended.length > 0) {
+                        const firstMedia = cardData.media_extended[0];
+                        thumbnailContent = `<img src="${firstMedia.url || firstMedia.thumbnail_url}" alt="Tweet thumbnail">`;
+                    } else if (cardData.mediaURLs && cardData.mediaURLs.length > 0) {
+                        thumbnailContent = `<img src="${cardData.mediaURLs[0]}" alt="Tweet thumbnail">`;
+                    } else {
+                        thumbnailContent = `<div class="thumbnail-item-placeholder">${(cardData.text || '').substring(0, 20)}</div>`;
+                    }
+                } catch (err) {
+                    thumbnailContent = `<div class="thumbnail-item-placeholder"><div class="loading-spinner small"></div></div>`;
+                }
+            } else {
+                thumbnailContent = `<div class="thumbnail-item-placeholder"><div class="loading-spinner small"></div></div>`;
+            }
+        }
+        // Priority 4: Loading marker
         else if (card.dataset.loading === 'true') {
             thumbnailContent = `<div class="thumbnail-item-placeholder"><div class="loading-spinner small"></div></div>`;
         }
-        // Priority 4: Error state
+        // Priority 5: Error state
         else {
             thumbnailContent = `<div class="thumbnail-item-placeholder">?</div>`;
         }
@@ -421,6 +452,8 @@ async function updateMainCard(index) {
                 }
                 delete card.dataset.loading;
                 updateCardDisplay(index);
+                // Also update thumbnail to remove spinner
+                updateThumbnail(index);
                 return;
             }
         }
@@ -462,6 +495,8 @@ async function updateMainCard(index) {
 
             // Now update the display with loaded data
             updateCardDisplay(index);
+            // Also update thumbnail to remove spinner
+            updateThumbnail(index);
         } catch (error) {
             console.error('[Modal] Failed to load card data:', error);
             showCardError();

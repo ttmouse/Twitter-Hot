@@ -849,6 +849,11 @@ function preloadAdjacentCards(cards, currentIndex, range = 3) {
                 data: tweetData
             });
             console.log('[Gallery Modal] Preloaded card', index, 'from API, tweetId:', itemTweetId);
+
+            // Notify modal to update thumbnail if it's open
+            if (typeof window.updateThumbnail === 'function') {
+                window.updateThumbnail(index);
+            }
         } catch (error) {
             console.warn('[Gallery Modal] Failed to preload card', index, error);
         }
