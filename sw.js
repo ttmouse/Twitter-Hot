@@ -1,5 +1,5 @@
-const CACHE_NAME = 'banana-hot-v9';
-const MEDIA_CACHE_NAME = 'banana-media-v9';
+const CACHE_NAME = 'banana-hot-v11';
+const MEDIA_CACHE_NAME = 'banana-media-v11';
 
 // Assets to cache immediately on install
 const PRE_CACHE_ASSETS = [
@@ -8,6 +8,9 @@ const PRE_CACHE_ASSETS = [
     '/styles.css',
     '/script.js',
     '/tweet-detail-modal.js',
+    '/tweet-detail-modal.css',
+    '/custom-tweet-card.js',
+    '/custom-tweet-card.css',
     '/libs/html2canvas.min.js',
     '/libs/jszip.min.js'
     // External libraries will be cached on first request, not pre-cached
@@ -112,13 +115,22 @@ self.addEventListener('fetch', event => {
     if (PRE_CACHE_ASSETS.some(asset => url.pathname.endsWith(asset) || url.pathname === '/')) {
         event.respondWith(
             caches.open(CACHE_NAME).then(cache => {
-                return cache.match(event.request).then(cachedResponse => {
+                // Use ignoreSearch: true to match requests like styles.css?v=10 against styles.css
+                return cache.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
                     const fetchPromise = fetch(event.request).then(networkResponse => {
                         if (networkResponse.ok) {
                             cache.put(event.request, networkResponse.clone());
                         }
                         return networkResponse;
+                    }).catch(err => {
+                        // Swallow background fetch errors if we have a cache
+                        if (cachedResponse) {
+                            console.warn('[SW] Background fetch failed for ' + url.pathname, err);
+                            return cachedResponse; // Keep promise chain valid
+                        }
+                        throw err;
                     });
+                    
                     return cachedResponse || fetchPromise;
                 });
             })

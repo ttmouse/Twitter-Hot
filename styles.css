@@ -766,6 +766,44 @@ body {
     border-color: var(--border-hover);
 }
 
+.gallery-author-info {
+    position: absolute;
+    top: 0px;
+    left: 0;
+    right: 0;
+    padding: 6px 10px 30px 10px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 100%);
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 0.8rem;
+    font-weight: 100;
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.gallery-author-link {
+    color: inherit;
+    text-decoration: none;
+    pointer-events: auto;
+    transition: color 0.2s;
+}
+
+.gallery-author-link:hover {
+    color: #fff;
+}
+
+.gallery-item:hover .gallery-author-info {
+    opacity: 1;
+}
+
+
 .gallery-thumb {
     width: 100%;
     border: none;

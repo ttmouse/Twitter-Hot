@@ -455,18 +455,10 @@ function scrollModalImages(direction) {
     const imagesContainer = document.getElementById('modalImages');
     if (!imagesContainer) return;
     
-    // Log for debugging
-    console.log('[Modal] scrollModalImages direction:', direction, 
-        'scrollLeft:', imagesContainer.scrollLeft,
-        'scrollWidth:', imagesContainer.scrollWidth, 
-        'clientWidth:', imagesContainer.clientWidth);
+    // Check if scrollable
+    if (imagesContainer.scrollWidth <= imagesContainer.clientWidth) return;
 
-    // If content is not scrollable (single image or fits in screen), 
-    // we might want to consider if we should do nothing or fallback.
-    // For now, strict adherence to "Left/Right = Scroll Image".
-    // If it can't scroll, it just won't scroll.
-    
-    // Scroll by one page width (minus a small buffer to show continuity if needed, but clientWidth is standard for "page")
+    // Scroll by one page width
     const scrollAmount = imagesContainer.clientWidth;
     
     imagesContainer.scrollBy({

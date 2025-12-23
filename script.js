@@ -654,6 +654,14 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                         wrapper.dataset.cachedMedia = JSON.stringify(images);
                         delete wrapper.dataset.loading;
                         // console.log('[Gallery] Data synced to wrapper for tweetId:', tweetId);
+
+                        // Update author info
+                        const authorInfo = wrapper.querySelector('.gallery-author-info');
+                        if (authorInfo && result.fullData.user_screen_name) {
+                            const screenName = result.fullData.user_screen_name;
+                            authorInfo.innerHTML = `<a href="https://twitter.com/${screenName}" target="_blank" rel="noopener noreferrer" class="gallery-author-link">@${screenName}</a>`;
+                            authorInfo.removeAttribute('hidden');
+                        }
                     }
 
                     // 为每张图片添加加载完成后的淡入动画
@@ -752,6 +760,7 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                         <div class="loading-spinner small"></div>
                     </div>
                 </button>
+                <div class="gallery-author-info" hidden></div>
                 <div class="gallery-icon-group">
                     <button type="button"
                         class="gallery-icon-button gallery-copy-icon"
