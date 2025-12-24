@@ -981,6 +981,14 @@
                 <label for="rawInput">Paste Links</label>
                 <textarea id="rawInput" placeholder="https://twitter.com/..." spellcheck="false"></textarea>
             </div>
+            <div class="form-group">
+                <label for="includeKeywords">Include Keywords</label>
+                <textarea id="includeKeywords" placeholder="Space separated (AND logic)" rows="1" spellcheck="false" style="min-height: 2.5rem; resize: none;"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="excludeKeywords">Exclude Keywords</label>
+                <textarea id="excludeKeywords" placeholder="Space separated (OR logic)" rows="1" spellcheck="false" style="min-height: 2.5rem; resize: none;"></textarea>
+            </div>
             <div class="sidebar-actions">
                 <button id="refreshPreviewBtn" class="btn" type="button">Preview</button>
                 <button id="clearInputBtn" class="btn" type="button">Clear</button>
@@ -1227,30 +1235,59 @@
             }
 
             // 重新渲染内容
-            applyDateFilter();
+            applyFilters();
         }
 
-        // 应用日期筛选
-        function applyDateFilter() {
-            // 获取所有卡片（包括可能在列中的或隐藏的）
-            // 注意：由于现在的结构是 列 -> 卡片，querySelectorAll 依然有效
+        // 综合筛选（日期 + 关键词）
+        function applyFilters() {
             const allCards = Array.from(document.querySelectorAll('.image-mode-card'));
             const container = document.getElementById('linkListImages');
 
+            // 获取关键词配置
+            const includeInput = document.getElementById('includeKeywords').value.trim().toLowerCase();
+            const excludeInput = document.getElementById('excludeKeywords').value.trim().toLowerCase();
+            const includeKeys = includeInput ? includeInput.split(/\s+/) : [];
+            const excludeKeys = excludeInput ? excludeInput.split(/\s+/) : [];
+
             // 先设置显隐状态
             allCards.forEach(card => {
-                const date = card.dataset.date;
+                let isVisible = true;
 
-                // 如果没有选中任何日期，显示所有
-                if (selectedDates.size === 0) {
-                    card.style.display = '';
+                // 1. 日期筛选
+                const date = card.dataset.date;
+                if (selectedDates.size > 0 && (!date || !selectedDates.has(date))) {
+                    isVisible = false;
                 }
-                // 如果卡片没有日期，或者日期在选中列表中，显示
-                else if (!date || selectedDates.has(date)) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
+
+                // 2. 关键词筛选 (仅当目前可见且有数据时)
+                if (isVisible && (includeKeys.length > 0 || excludeKeys.length > 0) && card.dataset.tweetData) {
+                    try {
+                        const data = JSON.parse(card.dataset.tweetData);
+                        // 组合所有可能包含文本的字段
+                        const text = [
+                            data.text, 
+                            data.full_text, 
+                            data.user_name, 
+                            data.user_screen_name
+                        ].filter(Boolean).join(' ').toLowerCase();
+
+                        // 包含逻辑 (AND)
+                        if (includeKeys.length > 0) {
+                            const allFound = includeKeys.every(key => text.includes(key));
+                            if (!allFound) isVisible = false;
+                        }
+
+                        // 排除逻辑 (OR)
+                        if (isVisible && excludeKeys.length > 0) {
+                            const anyFound = excludeKeys.some(key => text.includes(key));
+                            if (anyFound) isVisible = false;
+                        }
+                    } catch (e) {
+                        console.error('Filter error:', e);
+                    }
                 }
+
+                card.style.display = isVisible ? '' : 'none';
             });
 
             // 重新布局以填补空缺
@@ -1669,8 +1706,8 @@
                         loadedCount++;
                         // 所有数据加载完成后，按点赞数排序并初始化日期筛选器
                         if (loadedCount === totalUrls) {
-                            sortImageCardsByLikes(container);
                             initializeDateFilterFromCards();
+                            applyFilters();
                         }
                     })
                     .catch(() => {
@@ -1679,8 +1716,8 @@
                         loadedCount++;
                         // 即使有失败的，也要检查是否全部处理完
                         if (loadedCount === totalUrls) {
-                            sortImageCardsByLikes(container);
                             initializeDateFilterFromCards();
+                            applyFilters();
                         }
                     });
             });
@@ -1689,20 +1726,8 @@
             distributeCardsToColumns(container, cards);
         }
 
-        // 按点赞数对图片卡片进行降序排序
-        function sortImageCardsByLikes(container) {
-            const cards = Array.from(container.querySelectorAll('.image-mode-card'));
-
-            // 按 likes 数据属性降序排序
-            cards.sort((a, b) => {
-                const likesA = parseInt(a.dataset.likes) || 0;
-                const likesB = parseInt(b.dataset.likes) || 0;
-                return likesB - likesA; // 降序
-            });
-
-            // 使用 distributeCardsToColumns 重新布局
-            distributeCardsToColumns(container, cards);
-        }
+        // 按点赞数对图片卡片进行降序排序 (已废弃，功能合并入 applyFilters)
+        // function sortImageCardsByLikes(container) { ... }
 
         function initializeTweetLazyLoading() {
             if (tweetObserver) {
@@ -1890,6 +1915,17 @@
                 scheduleTextareaPreviewUpdate();
             });
 
+            // 关键词筛选监听
+            const includeInput = document.getElementById('includeKeywords');
+            const excludeInput = document.getElementById('excludeKeywords');
+            
+            const handleFilterChange = () => {
+                applyFilters();
+            };
+
+            includeInput.addEventListener('input', handleFilterChange);
+            excludeInput.addEventListener('input', handleFilterChange);
+
             refreshBtn.addEventListener('click', () => {
                 const hasFailedTweets = retryAllFailedTweets();
                 if (hasFailedTweets) {
@@ -1970,48 +2006,9 @@
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(() => {
-                    const container = document.getElementById('linkListImages');
-                    if (container.style.display !== 'none' && container.childElementCount > 0) {
-                        // 获取所有卡片（它们现在分散在各列中）
-                        // 注意：需要按原来的视觉顺序或者数据顺序收集？
-                        // 如果已经排序过，DOM顺序就是排序后的顺序（列1卡片1, 列1卡片2... 列2卡片1...）
-                        // 这样直接 querySelectorAll 会按 DOM 树顺序获取：先第一列所有，再第二列所有...
-                        // 这可能会打乱“按喜欢数排序”的整体顺序吗？
-                        // 是的。因为 Masonry 布局是横向分布的，而 DOM 结构是纵向分列的。
-                        // 如果直接按 DOM 顺序重排，会变成：原第一列的全部 -> 原第二列的全部...
-                        // 这会导致重新布局后的顺序错乱。
-                        
-                        // 解决方案：我们需要根据 dataset.likes 重新排序，或者如果不想改变顺序，需要一种方式恢复。
-                        // 但既然我们总是希望按 likes 排序，或者按初始顺序（如果没有 likes），我们可以再次执行排序逻辑。
-                        // 如果还没加载完，可能还没排序。
-                        
-                        // 简单起见，我们重新获取所有卡片，按 index 或者 likes 排序。
-                        // 由于 sortImageCardsByLikes 已经实现了按 likes 排序，我们可以直接利用它？
-                        // 但 sortImageCardsByLikes 只在加载完成后调用。
-                        
-                        // 这里我们应该尽量保持当前的顺序。
-                        // 我们可以根据卡片在 DOM 中的位置推断其顺序吗？很难。
-                        // 最好的办法是根据 dataset.index (原始顺序) 或者 dataset.likes (如果已排序) 来排序。
-                        
-                        const cards = Array.from(container.querySelectorAll('.image-mode-card'));
-                        
-                        // 检查是否已经有点赞数数据（说明已经加载并排序过）
-                        const hasLikesData = cards.some(c => parseInt(c.dataset.likes) > 0);
-                        
-                        if (hasLikesData) {
-                            cards.sort((a, b) => {
-                                const likesA = parseInt(a.dataset.likes) || 0;
-                                const likesB = parseInt(b.dataset.likes) || 0;
-                                // 如果点赞数相同，按 index 保持稳定
-                                if (likesB !== likesA) return likesB - likesA;
-                                return parseInt(a.dataset.index) - parseInt(b.dataset.index);
-                            });
-                        } else {
-                            // 还没加载完，按原始 index 排序
-                            cards.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
-                        }
-                        
-                        distributeCardsToColumns(container, cards);
+                    const mode = document.querySelector('input[name="previewMode"]:checked').value;
+                    if (mode === 'images') {
+                        applyFilters();
                     }
                 }, 200);
             });
