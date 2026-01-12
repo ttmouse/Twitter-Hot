@@ -2038,6 +2038,37 @@ function loadNextDate(lookaheadCount = 1, sessionId = null) {
     }, signal);
 }
 
+/**
+ * Kick off background preloading of upcoming dates without additional user scroll.
+ * @param {number} startIndex - Index of the date that finished loading
+ * @param {number} daysToLoad - How many future dates to fetch sequentially
+ */
+function preloadNextDates(startIndex, daysToLoad = 1) {
+    if (!Array.isArray(availableDates) || availableDates.length === 0 || !hasMoreDates) {
+        return;
+    }
+
+    let normalizedIndex = Number.isFinite(startIndex) ? startIndex : currentDateIndex;
+    if (normalizedIndex < 0) normalizedIndex = 0;
+    if (normalizedIndex >= availableDates.length - 1) {
+        hasMoreDates = false;
+        return;
+    }
+
+    if (currentDateIndex !== normalizedIndex) {
+        currentDateIndex = normalizedIndex;
+    }
+
+    const sessionId = window.preloadSessionId || Date.now();
+    if (!window.preloadSessionId) {
+        window.preloadSessionId = sessionId;
+    }
+
+    const safeCount = Math.max(1, daysToLoad);
+    console.log('[Preload] Starting background load from index', currentDateIndex + 1, 'for', safeCount, 'day(s)');
+    loadNextDate(safeCount, sessionId);
+}
+
 // Load next date for modal navigation - returns a Promise with new cards
 let currentModalLoadPromise = null;
 
