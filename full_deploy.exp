@@ -38,6 +38,15 @@ expect {
     eof
 }
 
+puts "\nStep 4: Deploying Frontend to Vercel..."
+# exec allows running commands directly without spawn/expect if no interaction is needed
+# catch handles errors gracefully
+if {[catch {exec npx vercel --prod --yes >@ stdout} result]} {
+    puts "Warning: Vercel deployment failed: $result"
+} else {
+    puts "Vercel deployment successful."
+}
+
 puts "\n=== Deployment Complete ==="
-puts "You can verify the site at http://$host"
+puts "You can verify the site at http://$host (Backend) and https://twitterhot.vercel.app (Frontend)"
 exit 0

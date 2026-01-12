@@ -3,6 +3,9 @@ import json
 import os
 import psycopg2
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # DB Connection Config (Internal Docker Network)
 # Using 'db' as hostname because this script runs inside the 'backend' container
@@ -61,15 +64,27 @@ def migrate():
                 if '?' in tweet_id:
                     tweet_id = tweet_id.split('?')[0]
                 
+                # Snowflake ID decoding to get Date (UTC+8 Beijing Time)
+                try:
+                    # Twitter Epoch: 1288834974657 (Nov 04 2010 01:42:54 UTC)
+                    snowflake_time = (int(tweet_id) >> 22) + 1288834974657
+                    # Convert to UTC+8 (Beijing Time) by adding 8 hours in milliseconds
+                    beijing_time_ms = snowflake_time + (8 * 60 * 60 * 1000)
+                    actual_date = datetime.utcfromtimestamp(beijing_time_ms / 1000).strftime('%Y-%m-%d')
+                except:
+                    # Fallback to database record date if ID invalid
+                    actual_date = publish_date
+                
                 # Insert into new tweets table
-                # We use ON CONFLICT DO NOTHING to avoid duplicates
+                # Upsert: Update date if ID exists (to fix previous wrong migration)
                 cur.execute("""
                     INSERT INTO tweets (tweet_id, publish_date, content, media_urls, author, tags)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (tweet_id) DO NOTHING
+                    ON CONFLICT (tweet_id) 
+                    DO UPDATE SET publish_date = EXCLUDED.publish_date
                 """, (
                     tweet_id, 
-                    publish_date, 
+                    actual_date, # Use calculated date from Snowflake ID
                     f"Migrated from {publish_date}",  # Placeholder content
                     json.dumps([]),                   # Empty media list
                     json.dumps({"name": "Unknown", "screen_name": "unknown"}), # Placeholder author

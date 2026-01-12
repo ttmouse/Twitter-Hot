@@ -5,7 +5,8 @@
     'use strict';
 
     // Configuration
-    let API_ENDPOINT = 'https://twitterhot.vercel.app/api/update';
+    const DEFAULT_API_ENDPOINT = 'https://ttmouse.com/api/update';
+    let API_ENDPOINT = DEFAULT_API_ENDPOINT;
     const BUTTON_ID_PREFIX = 'hot-content-btn-';
     const addedTweets = new Set(); // Track already added tweets
 
@@ -78,7 +79,7 @@
                 url: tweetUrl
             });
 
-            const response = await fetch(API_ENDPOINT, {
+            const response = await fetch(API_ENDPOINT || DEFAULT_API_ENDPOINT, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

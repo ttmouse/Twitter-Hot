@@ -224,3 +224,6 @@ logs/
 .gitignore
 .env.example
 deploy_secrets.exp
+.vercel
+.env*.local
+.gitignore

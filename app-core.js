@@ -140,6 +140,10 @@ function buildApiUrl(path) {
         // Hybrid Mode: If we are on Vercel (or any non-local, non-VPS domain), default to VPS API
         const host = window.location.hostname;
         if (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('ttmouse.com')) {
+            // EXCEPTION: Keep tweet_info on Vercel to use distributed Serverless IPs (avoid 429)
+            if (path.includes('tweet_info')) {
+                return path;
+            }
             console.log('Hybrid Mode detected: Defaulting API to https://ttmouse.com');
             return `https://ttmouse.com/${path.replace(/^\/+/, '')}`;
         }
@@ -198,6 +202,7 @@ window.apiFetch = apiFetch;
 window.buildApiUrl = buildApiUrl;
 window.getCurrentTheme = getCurrentTheme;
 window.fetchTweetMedia = fetchTweetMedia; // Expose for modal deduplication
+window.formatDate = formatDate;
 
 // Helper: Format Date to YYYY-MM-DD
 function formatDate(date) {
@@ -934,9 +939,13 @@ function fetchTweetMedia(tweetId) {
         }
     }
 
-    const promise = apiFetch(`/api/tweet_info?id=${tweetId}`)
+    const promise = throttleQueue.add(() => apiFetch(`/api/tweet_info?id=${tweetId}`))
         .then(res => {
             if (!res.ok) {
+                // If 429, we might want to wait longer, but for now just throw
+                if (res.status === 429) {
+                    console.warn(`Rate limit hit for ${tweetId}, backing off...`);
+                }
                 throw new Error('Failed to fetch tweet info');
             }
             return res.json();
@@ -966,6 +975,49 @@ function fetchTweetMedia(tweetId) {
     tweetMediaCache.set(tweetId, { promise });
     return promise;
 }
+
+// Global Throttle Queue
+class ThrottleQueue {
+    constructor(concurrency = 1, delay = 500) {
+        this.concurrency = concurrency;
+        this.delay = delay;
+        this.queue = [];
+        this.activeCount = 0;
+        this.lastRequestTime = 0;
+    }
+
+    add(fn) {
+        return new Promise((resolve, reject) => {
+            this.queue.push({ fn, resolve, reject });
+            this.process();
+        });
+    }
+
+    process() {
+        if (this.activeCount >= this.concurrency || this.queue.length === 0) {
+            return;
+        }
+
+        const now = Date.now();
+        const timeSinceLast = now - this.lastRequestTime;
+        const waitTime = Math.max(0, this.delay - timeSinceLast);
+
+        setTimeout(() => {
+            this.activeCount++;
+            const { fn, resolve, reject } = this.queue.shift();
+            this.lastRequestTime = Date.now();
+
+            fn().then(resolve)
+                .catch(reject)
+                .finally(() => {
+                    this.activeCount--;
+                    this.process();
+                });
+        }, waitTime);
+    }
+}
+// 1 concurrent request, 800ms delay between starts to vary gently
+const throttleQueue = new ThrottleQueue(1, 800);
 
 function extractImageUrlsFromTweetInfo(data) {
     const images = [];
@@ -2705,16 +2757,13 @@ function loadContentForDate(date, append = false, callback = null, signal = null
 
     // Phase 2: Hybrid Mode with Test Toggle
     // Check for 'test_db' query param or localStorage override
-    const urlParams = new URLSearchParams(window.location.search);
-    const useNewDb = urlParams.has('test_db') || localStorage.getItem('use_new_db') === 'true';
+    // Force use New Database API by default
+    const useNewDb = true;
 
     const formattedDate = formatDate(date);
-    const apiPath = useNewDb
-        ? `/api/tweets?date=${formattedDate}`
-        : `/api/daily_hot/${formattedDate}`;
-    if (useNewDb) {
-        console.log('[App] Using New Database API (/api/tweets)');
-    }
+    const apiPath = `/api/tweets?date=${formattedDate}`;
+
+    console.log('[App] Using New Database API (/api/tweets)');
     const startIndex = tweetUrls.length; // Save current length for append
 
     const fetchOptions = signal ? { signal } : {};

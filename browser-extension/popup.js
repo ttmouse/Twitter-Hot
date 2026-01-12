@@ -1,15 +1,30 @@
 // Twitter Hot Content Quick Add - Popup Script
 
+const DEFAULT_API_ENDPOINT = 'https://ttmouse.com/api/update';
+
+function getApiEndpoint() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(['apiEndpoint'], (result) => {
+            if (result.apiEndpoint) {
+                resolve(result.apiEndpoint);
+            } else {
+                chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT }, () => {
+                    resolve(DEFAULT_API_ENDPOINT);
+                });
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const manualUrlInput = document.getElementById('manualUrl');
     const quickAddBtn = document.getElementById('quickAdd');
     const addStatus = document.getElementById('addStatus');
 
-    // Set default API endpoint (hidden from user)
-    const defaultEndpoint = 'https://twitterhot.vercel.app/api/update';
+    // Ensure default API endpoint stored
     chrome.storage.sync.get(['apiEndpoint'], (result) => {
         if (!result.apiEndpoint) {
-            chrome.storage.sync.set({ apiEndpoint: defaultEndpoint });
+            chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT });
         }
     });
 
@@ -122,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         quickAddBtn.textContent = urls.length > 1 ? `Adding ${urls.length} tweets...` : 'Adding...';
 
         try {
-            const endpoint = defaultEndpoint;
+            const endpoint = await getApiEndpoint();
 
             // Get current date in local timezone (YYYY-MM-DD format)
             const now = new Date();
@@ -188,11 +203,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Quick Links buttons
-    document.getElementById('openWebsite').addEventListener('click', () => {
-        chrome.tabs.create({ url: 'https://twitterhot.vercel.app' });
+    document.getElementById('openWebsite').addEventListener('click', async () => {
+        chrome.tabs.create({ url: 'https://ttmouse.com' });
     });
 
     document.getElementById('openAdmin').addEventListener('click', () => {
-        chrome.tabs.create({ url: 'https://twitterhot.vercel.app/admin.html' });
+        chrome.tabs.create({ url: 'https://ttmouse.com/admin.html' });
     });
 });

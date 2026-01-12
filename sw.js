@@ -1,5 +1,5 @@
-const CACHE_NAME = 'banana-hot-v12'; // Bump version to force refresh
-const MEDIA_CACHE_NAME = 'banana-media-v12';
+const CACHE_NAME = 'banana-hot-v13'; // Bump version to force refresh
+const MEDIA_CACHE_NAME = 'banana-media-v13';
 
 // Assets to cache immediately on install
 const PRE_CACHE_ASSETS = [
