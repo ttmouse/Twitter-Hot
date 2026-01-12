@@ -1,7 +1,13 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
@@ -9,7 +15,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://platform.twitter.com https://*.twitter.com https://*.vercel-insights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.twimg.com; font-src 'self' https://fonts.gstatic.com; frame-src https://platform.twitter.com https://*.twitter.com; connect-src 'self' https://platform.twitter.com https://*.twitter.com https://*.twimg.com"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://platform.twitter.com https://*.twitter.com https://cdn.syndication.twimg.com https://*.vercel-insights.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' https://fonts.gstatic.com; frame-src https://platform.twitter.com https://*.twitter.com https://cdn.syndication.twimg.com; connect-src 'self' https://ttmouse.com http://38.55.192.139 https://*.twitter.com https://api.vxtwitter.com https:"
         }
       ]
     }
