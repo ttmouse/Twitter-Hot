@@ -2659,9 +2659,21 @@ function loadContentForDate(date, append = false, callback = null, signal = null
         // tweetMediaCache.clear(); // Persistence: Don't clear cache aggressively anymore
     }
 
-    // Phase 2: Use new /api/tweets API
+    // Phase 2: Hybrid Mode with Test Toggle
+    // Check for 'test_db' query param or localStorage override
+    const urlParams = new URLSearchParams(window.location.search);
+    const useNewDb = urlParams.has('test_db') || localStorage.getItem('use_new_db') === 'true';
+
     const formattedDate = formatDate(date);
-    const url = buildApiUrl(`api/tweets?date=${formattedDate}`);
+    let url;
+
+    if (useNewDb) {
+        console.log('[App] Using New Database API (/api/tweets)');
+        url = buildApiUrl(`api/tweets?date=${formattedDate}`);
+    } else {
+        // Default: Legacy API (Stable for Main Site)
+        url = buildApiUrl(`api/daily_hot/${formattedDate}`);
+    }
     const startIndex = tweetUrls.length; // Save current length for append
 
     const fetchOptions = signal ? { signal } : {};

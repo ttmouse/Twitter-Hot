@@ -4,6 +4,8 @@ import re
 import psycopg2
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
+import urllib.request
+import urllib.error
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -61,14 +63,40 @@ def init_db():
     except Exception as e:
         print(f"Error initializing database: {e}")
 
-import urllib.request
-
 class Handler(SimpleHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+    
+    def send_json_response(self, data, status=200, cache_control='no-store'):
+        """Helper to send JSON response with proper Content-Length"""
+        try:
+            body = json.dumps(data).encode('utf-8')
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', cache_control)
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as e:
+            print(f"Error sending response: {e}")
+
     def do_GET(self):
         parsed = urlparse(self.path)
+        path = parsed.path
+        
+        # Enable CORS PREFLIGHT for external access
+        # Note: Actual response headers are added in send_json_response or manually
+        if self.command == 'OPTIONS':
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         
         # Proxy endpoint for VxTwitter API (to avoid CORS)
-        if parsed.path == '/api/tweet_info':
+        if path == '/api/tweet_info':
             query = parse_qs(parsed.query)
             tweet_id = query.get('id', [''])[0]
             
@@ -111,24 +139,57 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(b'{"error":"proxy_error"}')
             return
 
-        if parsed.path == '/api/dates':
+        # Legacy API: /api/daily_hot/<date>
+        # Used by current main site app-core.js
+        if path.startswith('/api/daily_hot/'):
+            path_parts = path.split('/')
+            if len(path_parts) < 4:
+                self.send_error(400, "Invalid Path")
+                return
+            
+            date_str = path_parts[3]
             conn = get_db_connection()
             if not conn:
                 self.send_error(500, "Database connection failed")
                 return
-            
-            # TODO: Switch to querying 'tweets' table after migration
-            # For now, keep serving from daily_tweets to avoid breaking
+
             try:
                 cur = conn.cursor()
-                cur.execute("SELECT date FROM daily_tweets ORDER BY date DESC")
-                rows = cur.fetchall()
-                dates = [row[0] for row in rows]
+                cur.execute("SELECT urls FROM daily_tweets WHERE date = %s", (date_str,))
+                row = cur.fetchone()
+                
+                urls = []
+                if row:
+                    urls = row[0]
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps(dates).encode())
+                self.wfile.write(json.dumps(urls).encode())
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching daily_hot: {e}")
+                self.send_error(500, str(e))
+            return
+
+        # API: Get available dates
+        if path == '/api/dates':
+            conn = get_db_connection()
+            if not conn:
+                self.send_error(500, "Database connection failed")
+                return
+
+            try:
+                cur = conn.cursor()
+                # Query distinct dates from tweets table OR fallback to daily_tweets
+                # Prioritize daily_tweets for now as it's the master index
+                cur.execute("SELECT date FROM daily_tweets ORDER BY date DESC")
+                rows = cur.fetchall()
+                dates = [row[0] for row in rows]
+                
+                response_data = {'dates': [{'date': d} for d in dates]}
+                self.send_json_response(response_data)
                 cur.close()
                 conn.close()
             except Exception as e:
@@ -137,7 +198,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         # New API: Get tweets for a specific date (from new table)
-        if parsed.path == '/api/tweets':
+        if path == '/api/tweets':
             query = parse_qs(parsed.query)
             date_str = query.get('date', [''])[0]
             
@@ -153,6 +214,7 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 cur = conn.cursor()
                 # Fetch detailed tweets for the date
+                # Use tweet_id as tie-breaker for predictable sort
                 cur.execute("""
                     SELECT tweet_id, content, media_urls, author, tags 
                     FROM tweets 
@@ -171,49 +233,23 @@ class Handler(SimpleHTTPRequestHandler):
                         "tags": row[4]
                     })
                 
-                # FALLBACK: If new table is empty, try old table (during migration phase)
+                # FALLBACK: If new table is empty, try old table
                 if not tweets:
                     cur.execute("SELECT urls FROM daily_tweets WHERE date = %s", (date_str,))
                     row = cur.fetchone()
                     if row:
                         tweets = [{"id": url.split('/')[-1], "url": url} for url in row[0]]
 
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(tweets).encode())
+                self.send_json_response(tweets)
                 cur.close()
                 conn.close()
             except Exception as e:
                 print(f"Error fetching tweets: {e}")
                 self.send_error(500, str(e))
             return
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print(f"Error fetching tweets: {e}")
-                self.send_error(500, str(e))
-            return
-                cur.execute('SELECT date FROM daily_tweets ORDER BY date DESC')
-                rows = cur.fetchall()
-                dates = [row[0] for row in rows]
-                
-                response_data = {'dates': [{'date': d} for d in dates]}
-                body = json.dumps(response_data)
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Cache-Control', 'no-store')
-                self.end_headers()
-                self.wfile.write(body.encode('utf-8'))
-            except Exception as e:
-                print(f"Error serving /api/dates: {e}")
-                self.send_error(500, str(e))
-            finally:
-                if conn: conn.close()
-            return
-
-        elif parsed.path == '/api/data':
+            
+        # Legacy: /api/data?date=... (Mirror of daily_hot)
+        if path == '/api/data':
             qs = parse_qs(parsed.query)
             date = (qs.get('date') or [''])[0]
             if not date or not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
@@ -246,12 +282,20 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 if conn: conn.close()
             return
-            
-        return super().do_GET()
+
+        # 404 for other paths
+        self.send_error(404, "Endpoint not found")
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path == '/api/delete':
+        path = parsed.path
+        
+        # Enable CORS
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range')
+
+        if path == '/api/delete':
             length = int(self.headers.get('Content-Length') or 0)
             raw = self.rfile.read(length) if length > 0 else b''
             try:
@@ -280,7 +324,7 @@ class Handler(SimpleHTTPRequestHandler):
                 cur.execute('SELECT urls FROM daily_tweets WHERE date = %s', (date,))
                 row = cur.fetchone()
                 existing_urls = row[0] if row else []
-                # Ensure existing_urls is a list (handle potential string return from DB)
+                # Ensure existing_urls is a list
                 if isinstance(existing_urls, str):
                     try:
                         existing_urls = json.loads(existing_urls)
@@ -317,7 +361,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
 
-        elif parsed.path == '/api/update':
+        elif path == '/api/update':
             length = int(self.headers.get('Content-Length') or 0)
             raw = self.rfile.read(length) if length > 0 else b''
             try:
@@ -395,6 +439,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
             
+        # Handle OPTIONS for CORS
+        if self.command == 'OPTIONS':
+            self.send_response(200)
+            self.end_headers()
+            return
+
         self.send_response(404)
         self.end_headers()
 
