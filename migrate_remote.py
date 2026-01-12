@@ -12,7 +12,10 @@ load_dotenv()
 DB_HOST = "db"
 DB_NAME = os.environ.get('POSTGRES_DB', 'twitterhot')
 DB_USER = os.environ.get('POSTGRES_USER', 'twitteruser')
-DB_PASS = os.environ.get('POSTGRES_PASSWORD', 'TwitterHotSecurePass2026!')
+DB_PASS = os.environ.get('POSTGRES_PASSWORD')
+if not DB_PASS:
+    print("Error: POSTGRES_PASSWORD not set")
+    exit(1)
 
 BACKUP_FILE = 'neondb_backup_20260112_213330.json'
 

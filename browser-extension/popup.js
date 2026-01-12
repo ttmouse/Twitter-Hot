@@ -5,7 +5,13 @@ const DEFAULT_API_ENDPOINT = 'https://ttmouse.com/api/update';
 function getApiEndpoint() {
     return new Promise((resolve) => {
         chrome.storage.sync.get(['apiEndpoint'], (result) => {
-            if (result.apiEndpoint) {
+            // Migration: Force update if it matches old Vercel endpoint
+            if (result.apiEndpoint && result.apiEndpoint.includes('twitterhot.vercel.app')) {
+                console.log('Migrating API endpoint to new server...');
+                chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT }, () => {
+                    resolve(DEFAULT_API_ENDPOINT);
+                });
+            } else if (result.apiEndpoint) {
                 resolve(result.apiEndpoint);
             } else {
                 chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT }, () => {

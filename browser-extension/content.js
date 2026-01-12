@@ -12,7 +12,12 @@
 
     // Load API endpoint from storage
     chrome.storage.sync.get(['apiEndpoint'], (result) => {
-        if (result.apiEndpoint) {
+        // Migration: Force update if it matches old Vercel endpoint
+        if (result.apiEndpoint && result.apiEndpoint.includes('twitterhot.vercel.app')) {
+            console.log('[Hot Content] Migrating API endpoint to new server...');
+            API_ENDPOINT = DEFAULT_API_ENDPOINT;
+            chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT });
+        } else if (result.apiEndpoint) {
             API_ENDPOINT = result.apiEndpoint;
         }
     });

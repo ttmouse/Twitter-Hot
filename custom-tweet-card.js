@@ -14,7 +14,7 @@ class CustomTweetCard {
     async load() {
         if (this.loading) return;
         this.loading = true;
-        
+
         this.container.innerHTML = `
             <div class="custom-tweet-card loading">
                 <div class="loading-spinner"></div>
@@ -25,11 +25,11 @@ class CustomTweetCard {
         try {
             // Use our API to get tweet data
             const response = await fetch(`/api/tweet_info?id=${this.tweetId}`);
-            
+
             if (!response.ok) {
                 throw new Error(`Failed to fetch tweet: ${response.status}`);
             }
-            
+
             this.data = await response.json();
             this.render();
         } catch (error) {
@@ -95,6 +95,12 @@ class CustomTweetCard {
                            class="tweet-action-btn view-on-twitter">
                             View on X
                         </a>
+                        <a href="https://unimage.vercel.app/?url=https://x.com/${this.data.user_screen_name || 'unknown'}/status/${this.tweetId}" 
+                           target="_blank" 
+                           rel="noopener"
+                           class="tweet-action-btn">
+                            Unimage
+                        </a>
                     </div>
                 </div>
             </div>
@@ -112,12 +118,12 @@ class CustomTweetCard {
         let mediaHTML = '<div class="tweet-media">';
 
         if (images.length > 0) {
-            const gridClass = images.length === 1 ? 'single-image' : 
-                           images.length === 2 ? 'two-images' : 'multiple-images';
-            
+            const gridClass = images.length === 1 ? 'single-image' :
+                images.length === 2 ? 'two-images' : 'multiple-images';
+
             mediaHTML += `<div class="tweet-images ${gridClass}">`;
             images.forEach((img, i) => {
-                mediaHTML += `<img src="${img.url}" alt="Tweet image ${i+1}" class="tweet-image" crossOrigin="anonymous">`;
+                mediaHTML += `<img src="${img.url}" alt="Tweet image ${i + 1}" class="tweet-image" crossOrigin="anonymous">`;
             });
             mediaHTML += '</div>';
         }

@@ -723,6 +723,13 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                             const screenName = result.fullData.user_screen_name;
                             authorInfo.innerHTML = `<a href="https://twitter.com/${screenName}" target="_blank" rel="noopener noreferrer" class="gallery-author-link">@${screenName}</a>`;
                             authorInfo.removeAttribute('hidden');
+
+                            // Update Unimage link with correct username
+                            const unimageBtn = wrapper.querySelector('.gallery-unimage-icon');
+                            if (unimageBtn) {
+                                const tweetUrl = `https://x.com/${screenName}/status/${tweetId}`;
+                                unimageBtn.href = `https://unimage.vercel.app/?url=${encodeURIComponent(tweetUrl)}`;
+                            }
                         }
                     }
 
@@ -834,6 +841,18 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                             <path d="M16 1H6a3 3 0 0 0-3 3v11h2V4a1 1 0 0 1 1-1h10V1zm4 4H10a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3zm1 15a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v12z"/>
                         </svg>
                     </button>
+                    <a href="https://unimage.vercel.app/?url=${url}"
+                        target="_blank"
+                        rel="noopener"
+                        class="gallery-icon-button gallery-unimage-icon"
+                        aria-label="Open in Unimage"
+                        title="Open in Unimage">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                    </a>
                     <a href="${url}"
                         target="_blank"
                         rel="noopener"

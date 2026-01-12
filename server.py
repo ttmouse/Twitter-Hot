@@ -7,6 +7,7 @@ from urllib.parse import urlparse, parse_qs
 import urllib.request
 import urllib.error
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -200,11 +201,11 @@ class Handler(SimpleHTTPRequestHandler):
 
             try:
                 cur = conn.cursor()
-                # Query distinct dates from tweets table OR fallback to daily_tweets
-                # Prioritize daily_tweets for now as it's the master index
-                cur.execute("SELECT date FROM daily_tweets ORDER BY date DESC")
+                # Query distinct dates from tweets table
+                cur.execute("SELECT DISTINCT publish_date FROM tweets ORDER BY publish_date DESC")
                 rows = cur.fetchall()
-                dates = [row[0] for row in rows]
+                # Convert date objects to strings
+                dates = [str(row[0]) for row in rows]
                 
                 response_data = {'dates': [{'date': d} for d in dates]}
                 self.send_json_response(response_data)
@@ -421,7 +422,7 @@ class Handler(SimpleHTTPRequestHandler):
                     try:
                         snowflake_time = (int(tweet_id) >> 22) + 1288834974657
                         beijing_time_ms = snowflake_time + (8 * 60 * 60 * 1000)
-                        from datetime import datetime
+                        # from datetime import datetime (Moved to top)
                         actual_date = datetime.utcfromtimestamp(beijing_time_ms / 1000).strftime('%Y-%m-%d')
                     except:
                         actual_date = date

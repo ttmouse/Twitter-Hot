@@ -5,7 +5,13 @@ import psycopg2
 from datetime import datetime
 
 # NeonDB connection string from .env
-DB_URL = "postgresql://neondb_owner:npg_ik9hAnJjHa8b@ep-crimson-thunder-ah0e1rh0-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require"
+from dotenv import load_dotenv
+load_dotenv()
+DB_URL = os.getenv("NEON_DATABASE_URL")
+if not DB_URL:
+    print("Warning: NEON_DATABASE_URL not found in environment variables.")
+    # Example format: postgresql://user:pass@host/db?sslmode=require
+
 
 def backup_db():
     print(f"Connecting to NeonDB...")

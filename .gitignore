@@ -223,7 +223,20 @@ logs/
 *.log
 .gitignore
 .env.example
-deploy_secrets.exp
 .vercel
 .env*.local
 .gitignore
+
+
+# Secrets
+deploy_secrets.exp
+
+# Temporary Files
+manual_update*.exp
+manual_broadcast*.py
+query_db.exp
+check_env.exp
+verify_db_stats.py
+*_temp*.exp
+*.txt
+
