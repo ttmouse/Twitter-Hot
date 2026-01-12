@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+set timeout 600
+# Load configuration/secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    puts "Please copy deploy_secrets.example.exp to deploy_secrets.exp and fill in your values."
+    exit 1
+}
+
+puts "Step 1: Running setup_remote.sh on server..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "bash -s" < setup_remote.sh
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\nStep 2: Syncing files to server..."
+# Using rsync to sync files. Exclude .git and node_modules as they are large/unnecessary.
+spawn rsync -avz --exclude=.git --exclude=node_modules --exclude=deploy_secrets.exp -e "ssh -o StrictHostKeyChecking=no" . $user@$host:$remote_dir/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\nStep 2.5: Fixing permissions..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "chmod -R 755 $remote_dir"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\nStep 3: Starting Docker containers..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && docker compose up -d --build --remove-orphans"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\n=== Deployment Complete ==="
+puts "You can verify the site at http://$host"
+exit 0

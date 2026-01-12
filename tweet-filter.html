@@ -8,112 +8,35 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <!-- Tweet Detail Modal Component Styles -->
     <link rel="stylesheet" href="tweet-detail-modal.css">
+    <link rel="stylesheet" href="styles.css">
     <style>
-        :root {
-            /* Dark Mode (Default) */
-            --background-dark: #090909;
-            --foreground-dark: #f5f5f5;
-            --card-dark: #111111;
-            --muted-dark: #131313;
-            --muted-foreground-dark: #9a9a9a;
-            --border-dark: rgba(255, 255, 255, 0.1);
-
-            /* Light Mode */
-            --background-light: #FAFAF8;
-            --foreground-light: #1A1A1A;
-            --card-light: #FFFFFF;
-            --muted-light: #F5F3F0;
-            --muted-foreground-light: #6B6B6B;
-            --border-light: #E8E4DF;
-
-            /* Accent colors - same for both modes */
-            --accent: #B8860B;
-            --accent-secondary: #D4A84B;
-            --accent-foreground: #ffffff;
-
-            /* Default to Dark Mode */
-            --background: var(--background-dark);
-            --foreground: var(--foreground-dark);
-            --card: var(--card-dark);
-            --muted: var(--muted-dark);
-            --muted-foreground: var(--muted-foreground-dark);
-            --border: var(--border-dark);
-
-            /* Shadows */
-            --shadow-sm-dark: 0 1px 2px rgba(0, 0, 0, 0.4);
-            --shadow-sm-light: 0 1px 2px rgba(26, 26, 26, 0.04);
-            --shadow-sm: var(--shadow-sm-dark);
-            --shadow-accent-dark: 0 8px 24px rgba(184, 134, 11, 0.25);
-            --shadow-accent-light: 0 4px 16px rgba(184, 134, 11, 0.15);
-            --shadow-accent: var(--shadow-accent-dark);
-
-            --transition: 200ms ease;
-            --sidebar-width: 520px;
-        }
-
-        /* Light mode class */
-        body.light-mode {
-            --background: var(--background-light);
-            --foreground: var(--foreground-light);
-            --card: var(--card-light);
-            --muted: var(--muted-light);
-            --muted-foreground: var(--muted-foreground-light);
-            --border: var(--border-light);
-            --shadow-sm: var(--shadow-sm-light);
-            --shadow-accent: var(--shadow-accent-light);
-        }
-
-        /* Light mode scrollbar adjustments */
-        body.light-mode * {
-            scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.05);
-        }
-
-        body.light-mode *::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
-        body.light-mode *::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.15) 100%);
-            border-color: rgba(0, 0, 0, 0.1);
-        }
-
-        body.light-mode *::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.25) 100%);
-            border-color: rgba(0, 0, 0, 0.15);
-        }
-
-        body.light-mode *::-webkit-scrollbar-thumb:active {
-            background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.35) 100%);
-            border-color: rgba(0, 0, 0, 0.2);
-        }
-
         * {
             box-sizing: border-box;
         }
 
         body {
             margin: 0;
-            background: var(--background);
-            color: var(--foreground);
-            font-family: "Source Sans 3", system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: "Inter", system-ui, sans-serif;
             min-height: 100vh;
             letter-spacing: 0.01em;
+            line-height: 1.7;
+            padding: 0 !important;
+            /* Override styles.css padding-top: 64px */
         }
 
-        /* ============================================
-           SCROLLBAR STYLING - Minimalist Black & White
-           ============================================ */
-
-        /* Firefox */
+        /* SCROLLBAR STYLING - Using general styles from main.css */
         * {
             scrollbar-width: thin;
             scrollbar-color: rgba(255, 255, 255, 0.15) rgba(0, 0, 0, 0.3);
         }
 
-        /* WebKit Browsers (Chrome, Safari, Edge) */
         *::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -126,21 +49,21 @@
         }
 
         *::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.12) 100%);
+            background: rgba(255, 255, 255, 0.18);
             border-radius: 4px;
             border: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 0 4px rgba(255, 255, 255, 0.05);
-            transition: all 200ms ease;
+            transition: all var(--transition-fast);
         }
 
         *::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.2) 100%);
+            background: rgba(255, 255, 255, 0.25);
             border-color: rgba(255, 255, 255, 0.15);
             box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
         }
 
         *::-webkit-scrollbar-thumb:active {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.28) 100%);
+            background: rgba(255, 255, 255, 0.32);
             border-color: rgba(255, 255, 255, 0.2);
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
         }
@@ -153,7 +76,8 @@
 
         .filter-sidebar {
             width: var(--sidebar-width);
-            background: var(--card);
+            background: var(--bg-secondary);
+            /* Use bg-secondary from main styles */
             border-right: 1px solid var(--border);
             padding: 2rem 1.5rem;
             display: flex;
@@ -170,10 +94,13 @@
             font-size: 2rem;
             letter-spacing: -0.02em;
             margin-bottom: 0.25rem;
+            color: var(--text-primary);
+            /* Use text-primary */
         }
 
         .filter-description {
-            color: var(--muted-foreground);
+            color: var(--text-muted);
+            /* Use text-muted */
             font-size: 0.95rem;
             line-height: 1.6;
         }
@@ -185,47 +112,156 @@
             flex: 1;
         }
 
-        .form-group label {
-            text-transform: uppercase;
-            font-family: "IBM Plex Mono", monospace;
-            letter-spacing: 0.15em;
-            font-size: 0.75rem;
-            color: var(--accent);
-        }
-
-        textarea {
-            flex: 1;
+        /* New input field styles */
+        .input-field {
             width: 100%;
-            background: transparent;
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.75rem;
-            color: var(--foreground);
-            font-family: "Source Sans 3", system-ui, sans-serif;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-family: "Inter", system-ui, sans-serif;
             font-size: 0.875rem;
             line-height: 1.4;
-            resize: vertical;
-            min-height: 0;
+            transition: all var(--transition-fast);
         }
 
-        textarea:focus {
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+
+        .input-field:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.2);
+            box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
+            background: var(--bg-card-hover);
         }
 
-        .filter-sidebar textarea {
-            font-family: "IBM Plex Mono", monospace;
-            font-size: 0.75rem;
-            line-height: 1.5;
-            resize: none;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            overflow-y: auto;
-            flex: 1;
+        textarea.input-field {
+            resize: vertical;
             min-height: 0;
+            max-height: 300px;
+            line-height: 1.5;
         }
+
+
+
+        /* Custom Checkbox styles */
+        .custom-checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            user-select: none;
+            font-weight: 500;
+        }
+
+        .custom-checkbox-wrapper input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+
+        .checkmark {
+            height: 18px;
+            width: 18px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-right: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+            flex-shrink: 0;
+        }
+
+        .custom-checkbox-wrapper input:checked~.checkmark {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .checkmark:after {
+            content: "";
+            width: 5px;
+            height: 10px;
+            border: solid var(--accent-foreground);
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+
+        .custom-checkbox-wrapper input:checked~.checkmark:after {
+            opacity: 1;
+        }
+
+        .custom-checkbox-wrapper:hover input~.checkmark {
+            border-color: var(--accent);
+        }
+
+        .form-group label {
+            color: var(--text-secondary);
+            /* Use text-secondary */
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .action-button {
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-family: "Inter", system-ui, sans-serif;
+            /* Consistent font */
+            font-size: 0.875rem;
+            /* Consistent font size */
+            font-weight: 500;
+            /* Consistent font weight */
+            padding: 0.65rem 1.25rem;
+            /* Adjusted padding */
+            border-radius: var(--radius-sm);
+            /* Consistent border-radius */
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .action-button:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .action-button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--accent-foreground);
+            box-shadow: var(--shadow-accent);
+        }
+
+        .action-button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-accent);
+        }
+
 
         .sidebar-actions {
             display: flex;
@@ -233,38 +269,13 @@
             flex-wrap: wrap;
         }
 
-        .btn {
-            border: 1px solid var(--border);
-            background: var(--muted);
-            color: var(--foreground);
-            font-family: "IBM Plex Mono", monospace;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.6rem 0.9rem;
-            border-radius: 999px;
-            cursor: pointer;
-            transition: all var(--transition);
-            font-size: 0.75rem;
-        }
-
-        .btn.primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--accent-foreground);
-            box-shadow: var(--shadow-accent);
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            border-color: var(--accent);
-        }
-
         .filter-main {
             flex: 1;
             min-width: 0;
             display: flex;
             flex-direction: column;
-            padding: 2.5rem 3rem;
+            padding: 2rem 1.5rem;
+            /* Adjusted to match sidebar padding */
             gap: 1.5rem;
             max-height: 100vh;
             overflow-y: auto;
@@ -279,11 +290,14 @@
         }
 
         .status-pill {
-            font-family: "IBM Plex Mono", monospace;
+            font-family: "Inter", system-ui, sans-serif;
+            /* Changed font */
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.05em;
+            /* Adjusted letter-spacing */
             font-size: 0.8rem;
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed color */
         }
 
         .select-all-wrap {
@@ -291,13 +305,16 @@
             align-items: center;
             gap: 0.5rem;
             font-size: 0.85rem;
-            color: var(--muted-foreground);
-            font-family: "IBM Plex Mono", monospace;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            /* Changed color */
+            font-family: "Inter", system-ui, sans-serif;
+            /* Changed font */
+            letter-spacing: 0.05em;
+            /* Adjusted letter-spacing */
             cursor: pointer;
             user-select: none;
-            transition: color var(--transition);
+            transition: color var(--transition-fast);
+            /* Changed transition */
         }
 
         .select-all-wrap:hover {
@@ -312,7 +329,8 @@
 
         .preview-mode-toggle {
             display: flex;
-            background: var(--muted);
+            background: var(--bg-card);
+            /* Changed background */
             border-radius: 999px;
             border: 1px solid var(--border);
             padding: 3px;
@@ -327,16 +345,21 @@
             padding: 0.35rem 0.9rem;
             border-radius: 999px;
             font-size: 0.75rem;
-            font-family: "IBM Plex Mono", monospace;
+            font-family: "Inter", system-ui, sans-serif;
+            /* Changed font */
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--muted-foreground);
+            letter-spacing: 0.05em;
+            /* Adjusted letter-spacing */
+            color: var(--text-secondary);
+            /* Changed color */
             cursor: pointer;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
+            /* Changed transition */
         }
 
-        .preview-mode-toggle input:checked + label {
-            background: var(--background);
+        .preview-mode-toggle input:checked+label {
+            background: var(--bg-primary);
+            /* Changed background */
             color: var(--accent);
         }
 
@@ -346,15 +369,19 @@
             align-items: center;
             gap: 0.5rem;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
+            /* Changed to var(--radius-sm) */
             padding: 0.4rem 0.75rem;
-            background: var(--muted);
+            background: var(--bg-card);
+            /* Changed to var(--bg-card) */
             font-size: 0.8rem;
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: 'Inter', system-ui, sans-serif;
+            /* Changed font */
         }
 
         .date-filter-label {
-            color: var(--muted-foreground);
+            color: var(--text-muted);
+            /* Changed to var(--text-muted) */
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -369,25 +396,47 @@
         .date-chip {
             padding: 0.25rem 0.65rem;
             border-radius: 999px;
-            background: var(--background);
+            background: var(--bg-primary);
+            /* Changed to var(--bg-primary) */
             border: 1px solid var(--border);
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed to var(--text-secondary) */
             font-size: 0.7rem;
             cursor: pointer;
-            transition: all var(--transition);
+            white-space: nowrap;
+            /* Added for consistency */
+            flex-shrink: 0;
+            /* Added for consistency */
+            transition: all var(--transition-fast);
+            /* Changed transition */
             user-select: none;
         }
 
+        .date-chip:first-child {
+            /* Added for consistency */
+            margin-left: 0;
+        }
+
+        .date-chip:last-child {
+            /* Added for consistency */
+            margin-right: 0;
+        }
+
         .date-chip:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+            background: var(--bg-card-hover);
+            /* Changed to var(--bg-card-hover) */
+            color: var(--text-primary);
+            /* Changed to var(--text-primary) */
+            border-color: var(--border-hover);
+            /* Changed to var(--border-hover) */
         }
 
         .date-chip.active {
             background: var(--accent);
             border-color: var(--accent);
             color: var(--accent-foreground);
-            box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.3);
+            box-shadow: 0 0 8px rgba(var(--accent-primary-rgb), 0.3);
+            /* Changed accent-rgb to accent-primary-rgb */
         }
 
         .date-chip .count {
@@ -397,24 +446,36 @@
 
         /* Theme Toggle Button */
         .theme-toggle {
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            /* Changed width */
+            height: 38px;
+            /* Changed height */
             border-radius: 50%;
             border: 1px solid var(--border);
-            background: var(--muted);
+            background: var(--bg-card);
+            /* Changed background */
+            color: var(--text-primary);
+            /* Changed color */
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all var(--transition);
+            box-shadow: var(--shadow-sm);
+            /* Added box-shadow */
             flex-shrink: 0;
+            transition: all var(--transition-fast);
+            /* Changed transition */
         }
 
         .theme-toggle:hover {
             background: var(--accent);
-            border-color: var(--accent);
+            border-color: transparent;
+            /* Changed border-color */
             color: var(--accent-foreground);
-            transform: rotate(15deg);
+            transform: rotate(8deg);
+            /* Changed transform */
+            box-shadow: var(--shadow-md);
+            /* Changed box-shadow */
         }
 
         .theme-toggle svg {
@@ -424,7 +485,8 @@
 
         .masonry-preview {
             column-count: 3;
-            column-gap: 1rem;
+            column-gap: var(--spacing-md);
+            /* Use spacing variable */
         }
 
         @media (max-width: 1400px) {
@@ -441,13 +503,14 @@
 
         .tweet-card-wrapper {
             break-inside: avoid;
-            margin-bottom: 1rem;
+            margin-bottom: var(--spacing-sm);
+            /* Use spacing variable */
             position: relative;
             background: transparent;
             border: none;
             border-radius: 0;
             overflow: visible;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             cursor: pointer;
         }
 
@@ -481,7 +544,8 @@
             align-items: center;
             justify-content: center;
             width: 100%;
-            pointer-events: none;
+            pointer-events: auto;
+            /* Changed from none to allow video interaction */
         }
 
         .tweet-embed-container:not(.loaded) {
@@ -492,11 +556,13 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: var(--muted);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: var(--radius-md);
+            /* Use radius variable */
             opacity: 1;
-            transition: opacity 0.4s ease;
+            transition: opacity var(--transition-fast);
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             z-index: 0;
         }
@@ -510,7 +576,7 @@
             animation: none;
         }
 
-        .tweet-embed-container > * {
+        .tweet-embed-container>* {
             position: relative;
             z-index: 1;
         }
@@ -520,7 +586,7 @@
             margin: 0 !important;
         }
 
-        .tweet-card-wrapper > .tweet-card-footer {
+        .tweet-card-wrapper>.tweet-card-footer {
             display: none;
         }
 
@@ -533,7 +599,7 @@
             gap: 8px;
             opacity: 0;
             transform: translateY(-4px);
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             pointer-events: none;
         }
 
@@ -549,18 +615,20 @@
             height: 36px;
             border-radius: 50%;
             border: 1px solid var(--border);
-            background: var(--card);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             backdrop-filter: blur(8px);
         }
 
         .card-link-btn {
             text-decoration: none;
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed to text-secondary */
         }
 
         .card-link-btn:hover {
@@ -593,7 +661,7 @@
             align-items: center;
             justify-content: center;
             color: transparent;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             box-shadow: var(--shadow-sm);
             pointer-events: none;
         }
@@ -606,17 +674,17 @@
             stroke-width: 3;
             fill: none;
             transform: scale(0.85);
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
         }
 
-        .card-select-btn input:checked + .card-select-indicator {
+        .card-select-btn input:checked+.card-select-indicator {
             background: var(--accent);
             border-color: var(--accent);
             color: var(--accent-foreground);
             box-shadow: var(--shadow-accent);
         }
 
-        .card-select-btn input:checked + .card-select-indicator svg {
+        .card-select-btn input:checked+.card-select-indicator svg {
             opacity: 1;
             transform: scale(1);
         }
@@ -638,13 +706,15 @@
         /* Removed column-count based media queries as we handle columns in JS now */
 
         .image-mode-card {
-            background: var(--card);
-            border-radius: 8px;
+            background: var(--bg-card);
+            /* Changed to bg-card */
+            border-radius: var(--radius-sm);
+            /* Use radius variable */
             overflow: hidden;
             border: 1px solid var(--border);
             break-inside: avoid;
             margin-bottom: 3px;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             position: relative;
             cursor: pointer;
             display: flex;
@@ -652,51 +722,18 @@
         }
 
         .image-mode-card:hover {
-            border-color: rgba(184, 134, 11, 0.4);
+            border-color: var(--accent);
+            /* Changed to accent */
         }
 
         .image-mode-card.selected {
-            background: rgba(184, 134, 11, 0.02);
-            border-color: rgba(184, 134, 11, 0.3);
+            background: rgba(var(--accent-primary-rgb), 0.02);
+            /* Changed to accent-primary-rgb */
+            border-color: rgba(var(--accent-primary-rgb), 0.3);
+            /* Changed to accent-primary-rgb */
         }
 
-        /* Light mode adjustments for image cards */
-        body.light-mode .image-mode-card:hover {
-            border-color: rgba(107, 107, 107, 0.3);
-        }
-
-        body.light-mode .image-mode-card.selected {
-            background: rgba(0, 0, 0, 0.02);
-            border-color: rgba(107, 107, 107, 0.25);
-        }
-
-        body.light-mode .image-card-likes {
-            color: var(--foreground);
-        }
-
-        body.light-mode .image-card-action-btn:hover {
-            background: var(--foreground);
-            border-color: var(--foreground);
-            color: var(--background);
-        }
-
-        body.light-mode .image-card-action-btn.copied {
-            background: var(--foreground);
-            border-color: var(--foreground);
-            color: var(--background);
-        }
-
-        body.light-mode .image-card-check-indicator {
-            background: var(--background);
-            border-color: var(--muted-foreground);
-        }
-
-        body.light-mode .image-mode-card.selected .image-card-check-indicator {
-            background: var(--foreground);
-            border-color: var(--foreground);
-            color: var(--background);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
+        /* Removed Light mode adjustments for image cards, rely on global vars */
 
         .image-mode-card.unchecked {
             opacity: 0.4;
@@ -717,7 +754,8 @@
         .image-mode-card .loading-placeholder {
             padding: 2rem;
             text-align: center;
-            color: var(--muted-foreground);
+            color: var(--text-muted);
+            /* Changed to text-muted */
         }
 
         .image-card-info {
@@ -726,7 +764,8 @@
             flex-direction: column;
             gap: 0.4rem;
             border-top: 1px solid var(--border);
-            background: var(--card);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             font-size: 0.8rem;
         }
 
@@ -738,8 +777,10 @@
         }
 
         .image-card-username {
-            color: var(--muted-foreground);
-            font-family: 'IBM Plex Mono', monospace;
+            color: var(--text-secondary);
+            /* Changed to text-secondary */
+            font-family: 'Inter', system-ui, sans-serif;
+            /* Changed font */
             font-size: 0.75rem;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -749,7 +790,8 @@
 
         .image-card-likes {
             color: var(--accent);
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: 'Inter', system-ui, sans-serif;
+            /* Changed font */
             font-size: 0.75rem;
             display: flex;
             align-items: center;
@@ -763,9 +805,25 @@
             fill: currentColor;
         }
 
-        .image-card-date {
-            color: var(--muted-foreground);
+        .image-card-char-count {
+            color: var(--text-muted);
             font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex-shrink: 0;
+            padding: 2px 6px;
+            background: rgba(var(--accent-primary-rgb), 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(var(--accent-primary-rgb), 0.2);
+        }
+
+        .image-card-date {
+            color: var(--text-muted);
+            /* Changed to text-muted */
+            font-family: 'Inter', system-ui, sans-serif;
+            /* Changed font */
             font-size: 0.7rem;
             opacity: 0.8;
         }
@@ -781,7 +839,7 @@
             gap: 8px;
             opacity: 0;
             transform: translateY(-4px);
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             pointer-events: none;
         }
 
@@ -796,14 +854,16 @@
             height: 32px;
             border-radius: 50%;
             border: 1px solid var(--border);
-            background: var(--card);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             backdrop-filter: blur(8px);
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed to text-secondary */
         }
 
         .image-card-action-btn:hover {
@@ -829,14 +889,15 @@
             left: 8px;
             width: 24px;
             height: 24px;
-            background: var(--card);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             border: 2px solid var(--border);
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transition: all var(--transition);
+            transition: all var(--transition-fast);
             backdrop-filter: blur(8px);
             z-index: 90;
         }
@@ -856,11 +917,14 @@
         .status-message {
             padding: 0.65rem 1rem;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--bg-card);
+            /* Changed to bg-card */
             font-size: 0.85rem;
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed to text-secondary */
             display: none;
         }
+
 
         .status-message.success {
             color: var(--accent-secondary);
@@ -875,49 +939,51 @@
             border-top: 1px solid var(--border);
         }
 
-        .home-link {
-            padding: 0.65rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            text-decoration: none;
-            color: var(--muted-foreground);
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all var(--transition);
-            font-family: 'IBM Plex Mono', monospace;
-            letter-spacing: 0.02em;
-        }
-
-        .home-link:hover {
-            background: var(--muted);
-            border-color: var(--accent);
-            color: var(--accent);
-            transform: translateY(-1px);
-        }
-
+        .home-link,
         .twitter-link {
-            padding: 0.65rem;
+            padding: 8px 14px;
+            /* Adjusted padding */
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
+            /* Adjusted border-radius */
             text-decoration: none;
-            color: var(--muted-foreground);
+            color: var(--text-secondary);
+            /* Changed color */
             font-size: 0.875rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            transition: all var(--transition);
-            font-family: 'IBM Plex Mono', monospace;
+            transition: all var(--transition-fast);
+            /* Changed transition */
+            font-family: 'Inter', system-ui, sans-serif;
+            /* Changed font */
             letter-spacing: 0.02em;
+            /* Adjusted letter-spacing */
+            background: var(--bg-card);
+            /* Added background */
         }
 
+        .home-link:hover,
         .twitter-link:hover {
-            background: var(--muted);
-            border-color: var(--accent);
-            color: var(--accent);
+            background: var(--bg-card-hover);
+            /* Changed background */
+            border-color: var(--border-hover);
+            /* Changed border-color */
+            color: var(--text-primary);
+            /* Changed color */
             transform: translateY(-1px);
         }
+
+        .home-link svg,
+        .twitter-link svg {
+            width: 16px;
+            /* Set explicit width */
+            height: 16px;
+            /* Set explicit height */
+            flex-shrink: 0;
+            /* Prevent shrinking */
+        }
+
 
         @keyframes pulse {
             0% {
@@ -948,7 +1014,8 @@
             }
 
             .filter-main {
-                padding: 1.5rem;
+                padding: var(--spacing-md);
+                /* Changed to use CSS variable */
                 max-height: none;
                 overflow: visible;
             }
@@ -979,32 +1046,51 @@
             </div>
             <div class="form-group">
                 <label for="rawInput">Paste Links</label>
-                <textarea id="rawInput" placeholder="https://twitter.com/..." spellcheck="false"></textarea>
+                <textarea id="rawInput" placeholder="https://twitter.com/..." spellcheck="false"
+                    class="input-field"></textarea>
             </div>
             <div class="form-group">
                 <label for="includeKeywords">Include Keywords</label>
-                <textarea id="includeKeywords" placeholder="Space separated (AND logic)" rows="1" spellcheck="false" style="min-height: 2.5rem; resize: none;"></textarea>
+                <textarea id="includeKeywords" placeholder="Space separated (AND logic)" rows="1" spellcheck="false"
+                    class="input-field"></textarea>
             </div>
             <div class="form-group">
                 <label for="excludeKeywords">Exclude Keywords</label>
-                <textarea id="excludeKeywords" placeholder="Space separated (OR logic)" rows="1" spellcheck="false" style="min-height: 2.5rem; resize: none;"></textarea>
+                <textarea id="excludeKeywords" placeholder="Space separated (OR logic)" rows="1" spellcheck="false"
+                    class="input-field"></textarea>
             </div>
+            <div class="filter-group">
+                <label for="minLikes">Min Likes:</label>
+                <input type="text" id="minLikes" placeholder="e.g., 100" class="input-field">
+            </div>
+            <div class="filter-group">
+                <label for="minTextLength">Min Text Length:</label>
+                <input type="text" id="minTextLength" placeholder="e.g., 50" class="input-field">
+            </div>
+            <div class="filter-group">
+                <label for="maxTextLength">Max Text Length:</label>
+                <input type="text" id="maxTextLength" placeholder="e.g., 280" class="input-field">
+            </div>
+
+
             <div class="sidebar-actions">
-                <button id="refreshPreviewBtn" class="btn" type="button">Preview</button>
-                <button id="clearInputBtn" class="btn" type="button">Clear</button>
-                <button id="copySelectedBtn" class="btn primary" type="button">Copy Links</button>
+                <button id="refreshPreviewBtn" class="action-button" type="button">Preview</button>
+                <button id="clearInputBtn" class="action-button" type="button">Clear</button>
+                <button id="copySelectedBtn" class="action-button primary" type="button">Copy Links</button>
             </div>
             <div id="sidebarStatus" class="status-message" role="status"></div>
             <div class="sidebar-links">
                 <a href="index.html" class="home-link">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
                     </svg>
                     Trending Monitor
                 </a>
                 <a href="https://x.com/ttmouse" target="_blank" rel="noopener" class="twitter-link">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        <path
+                            d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                     </svg>
                     Follow @ttmouse
                 </a>
@@ -1031,8 +1117,10 @@
                     <span class="date-filter-label">Date</span>
                     <div class="date-chips" id="dateChips"></div>
                 </div>
-                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
-                    <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme"
+                    title="Toggle theme">
+                    <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
                         <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -1052,10 +1140,10 @@
 
     <script>
         // Initialize theme immediately to prevent flash
-        (function() {
-            const savedTheme = localStorage.getItem('tweet-filter-theme') || 'dark';
+        (function () {
+            const savedTheme = localStorage.getItem('site-theme') || 'dark';
             if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
+                document.documentElement.classList.add('light-mode');
             }
         })();
 
@@ -1249,6 +1337,17 @@
             const includeKeys = includeInput ? includeInput.split(/\s+/) : [];
             const excludeKeys = excludeInput ? excludeInput.split(/\s+/) : [];
 
+            // 获取文本长度筛选配置
+            const minTextLength = parseInt(document.getElementById('minTextLength').value.trim());
+            const maxTextLength = parseInt(document.getElementById('maxTextLength').value.trim());
+
+            // 获取 'Verified Accounts' 配置
+
+
+            // 获取 'Min Likes' 配置
+            const minLikes = parseInt(document.getElementById('minLikes').value.trim());
+
+
             // 先设置显隐状态
             allCards.forEach(card => {
                 let isVisible = true;
@@ -1260,14 +1359,14 @@
                 }
 
                 // 2. 关键词筛选 (仅当目前可见且有数据时)
-                if (isVisible && (includeKeys.length > 0 || excludeKeys.length > 0) && card.dataset.tweetData) {
+                if (isVisible && (includeKeys.length > 0 || excludeKeys.length > 0 || !isNaN(minTextLength) || !isNaN(maxTextLength) || !isNaN(minLikes)) && card.dataset.tweetData) {
                     try {
                         const data = JSON.parse(card.dataset.tweetData);
                         // 组合所有可能包含文本的字段
                         const text = [
-                            data.text, 
-                            data.full_text, 
-                            data.user_name, 
+                            data.text,
+                            data.full_text,
+                            data.user_name,
                             data.user_screen_name
                         ].filter(Boolean).join(' ').toLowerCase();
 
@@ -1282,6 +1381,27 @@
                             const anyFound = excludeKeys.some(key => text.includes(key));
                             if (anyFound) isVisible = false;
                         }
+
+                        // 3. 文本长度筛选
+                        if (isVisible && (!isNaN(minTextLength) || !isNaN(maxTextLength))) {
+                            const tweetTextContent = data.full_text || data.text || '';
+                            const currentTextLength = tweetTextContent.length;
+
+                            if (!isNaN(minTextLength) && currentTextLength < minTextLength) {
+                                isVisible = false;
+                            }
+                            if (isVisible && !isNaN(maxTextLength) && currentTextLength > maxTextLength) {
+                                isVisible = false;
+                            }
+                        }
+
+
+
+                        // 5. Min Likes 筛选
+                        if (isVisible && !isNaN(minLikes) && (data.favorite_count || 0) < minLikes) {
+                            isVisible = false;
+                        }
+
                     } catch (e) {
                         console.error('Filter error:', e);
                     }
@@ -1479,11 +1599,11 @@
 
         function distributeCardsToColumns(container, cards) {
             // 保存当前的滚动位置（如果需要）
-            
+
             container.innerHTML = '';
             const colCount = getMasonryColumnCount();
             const columns = [];
-            
+
             // 创建列
             for (let i = 0; i < colCount; i++) {
                 const col = document.createElement('div');
@@ -1501,7 +1621,7 @@
                     // 后续行填充到最短的列
                     let minHeight = Infinity;
                     let targetCol = columns[0];
-                    
+
                     columns.forEach(col => {
                         // 使用 offsetHeight 获取高度，这会触发回流，但在卡片数量不多时可以接受
                         if (col.offsetHeight < minHeight) {
@@ -1509,7 +1629,7 @@
                             targetCol = col;
                         }
                     });
-                    
+
                     targetCol.appendChild(card);
                 }
             });
@@ -1519,7 +1639,7 @@
             console.log('[Debug] renderImagePreview called with', urls.length, 'URLs');
             // 不要立即清空，让 distributeCardsToColumns 处理
             // container.innerHTML = ''; 
-            
+
             let loadedCount = 0;
             const totalUrls = urls.length;
             const cards = [];
@@ -1561,6 +1681,7 @@
                     <div class="image-card-info" id="img-info-${index}" style="display:none;">
                         <div class="image-card-meta">
                             <span class="image-card-username">@username</span>
+                            <span class="image-card-char-count" id="img-chars-${index}" style="display:none;"></span>
                             <span class="image-card-likes">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
@@ -1681,6 +1802,18 @@
 
                             infoBar.querySelector('.image-card-username').textContent = `@${username}`;
                             infoBar.querySelector('.image-card-likes span').textContent = formattedLikes;
+
+                            // 显示字符数
+                            const charCountElement = document.getElementById(`img-chars-${index}`);
+                            if (charCountElement) {
+                                const tweetText = data.full_text || data.text || '';
+                                const charCount = tweetText.length;
+                                if (charCount > 0) {
+                                    charCountElement.textContent = `${charCount} chars`;
+                                    charCountElement.title = `${charCount} characters`;
+                                    charCountElement.style.display = 'flex';
+                                }
+                            }
 
                             // 显示日期时间
                             const dateElement = document.getElementById(`img-date-${index}`);
@@ -1918,13 +2051,81 @@
             // 关键词筛选监听
             const includeInput = document.getElementById('includeKeywords');
             const excludeInput = document.getElementById('excludeKeywords');
-            
+            const minTextLengthInput = document.getElementById('minTextLength');
+            const maxTextLengthInput = document.getElementById('maxTextLength');
+            const minLikesInput = document.getElementById('minLikes');
+
+
+            // 缓存键名
+            const CACHE_KEYS = {
+                includeKeywords: 'tweet-filter-include-keywords',
+                excludeKeywords: 'tweet-filter-exclude-keywords',
+                minTextLength: 'tweet-filter-min-text-length',
+                maxTextLength: 'tweet-filter-max-text-length',
+                minLikes: 'tweet-filter-min-likes',
+
+                selectAll: 'tweet-filter-select-all'
+            };
+
+            // 恢复缓存的值
+            const restoreCachedValues = () => {
+                // 恢复文本输入
+                const cachedInclude = localStorage.getItem(CACHE_KEYS.includeKeywords);
+                if (cachedInclude !== null) includeInput.value = cachedInclude;
+
+                const cachedExclude = localStorage.getItem(CACHE_KEYS.excludeKeywords);
+                if (cachedExclude !== null) excludeInput.value = cachedExclude;
+
+                const cachedMinText = localStorage.getItem(CACHE_KEYS.minTextLength);
+                if (cachedMinText !== null) minTextLengthInput.value = cachedMinText;
+
+                const cachedMaxText = localStorage.getItem(CACHE_KEYS.maxTextLength);
+                if (cachedMaxText !== null) maxTextLengthInput.value = cachedMaxText;
+
+                const cachedMinLikes = localStorage.getItem(CACHE_KEYS.minLikes);
+                if (cachedMinLikes !== null) minLikesInput.value = cachedMinLikes;
+
+                // 恢复复选框
+
+
+                const cachedSelectAll = localStorage.getItem(CACHE_KEYS.selectAll);
+                if (cachedSelectAll !== null) selectAll.checked = cachedSelectAll === 'true';
+            };
+
+            // 页面加载时恢复缓存
+            restoreCachedValues();
+
             const handleFilterChange = () => {
                 applyFilters();
             };
 
-            includeInput.addEventListener('input', handleFilterChange);
-            excludeInput.addEventListener('input', handleFilterChange);
+            // 添加自动保存监听器
+            includeInput.addEventListener('input', () => {
+                localStorage.setItem(CACHE_KEYS.includeKeywords, includeInput.value);
+                handleFilterChange();
+            });
+
+            excludeInput.addEventListener('input', () => {
+                localStorage.setItem(CACHE_KEYS.excludeKeywords, excludeInput.value);
+                handleFilterChange();
+            });
+
+            minTextLengthInput.addEventListener('input', () => {
+                localStorage.setItem(CACHE_KEYS.minTextLength, minTextLengthInput.value);
+                handleFilterChange();
+            });
+
+            maxTextLengthInput.addEventListener('input', () => {
+                localStorage.setItem(CACHE_KEYS.maxTextLength, maxTextLengthInput.value);
+                handleFilterChange();
+            });
+
+            minLikesInput.addEventListener('input', () => {
+                localStorage.setItem(CACHE_KEYS.minLikes, minLikesInput.value);
+                handleFilterChange();
+            });
+
+
 
             refreshBtn.addEventListener('click', () => {
                 const hasFailedTweets = retryAllFailedTweets();
@@ -1938,6 +2139,10 @@
 
             selectAll.addEventListener('change', (event) => {
                 const isChecked = event.target.checked;
+
+                // 保存 selectAll 状态到缓存
+                localStorage.setItem(CACHE_KEYS.selectAll, isChecked);
+
                 // 只操作当前模式下的复选框
                 const mode = document.querySelector('input[name="previewMode"]:checked').value;
                 const currentContainer = mode === 'images'
@@ -1982,6 +2187,38 @@
             // 详情按钮点击事件（使用事件委托）
             document.addEventListener('click', (e) => {
                 const detailBtn = e.target.closest('.image-card-detail-btn');
+                if (!detailBtn) return;
+
+                e.preventDefault(); // 阻止默认行为，如链接跳转
+                e.stopPropagation(); // 阻止事件冒泡到卡片本身的选择逻辑
+
+                const wrapper = detailBtn.closest('.image-mode-card');
+                if (!wrapper) return;
+
+                const tweetId = detailBtn.dataset.tweetId;
+                const tweetUrl = wrapper.dataset.url;
+                const tweetIndex = parseInt(wrapper.dataset.index);
+
+                let initialData = {};
+                if (wrapper.dataset.tweetData) {
+                    try {
+                        initialData = JSON.parse(wrapper.dataset.tweetData);
+                    } catch (error) {
+                        console.error('Error parsing tweetData from dataset:', error);
+                    }
+                }
+
+                // 获取所有图片模式卡片，用于模态框中的前后导航
+                const allImageCards = Array.from(document.querySelectorAll('.image-mode-card'));
+
+                if (tweetId && typeof openTweetDetail === 'function') {
+                    openTweetDetail(initialData, tweetUrl, tweetIndex, allImageCards);
+                } else {
+                    console.warn('openTweetDetail function not found or tweetId missing.');
+                    // 备用方案：如果模态框无法打开，尝试直接在新标签页打开推文
+                    window.open(tweetUrl, '_blank');
+                }
+
                 if (detailBtn) {
                     const wrapper = detailBtn.closest('.image-mode-card');
                     if (wrapper && wrapper.dataset.tweetData) {
@@ -2065,19 +2302,25 @@
                         <div class="tweet-detail-footer-stats">
                             <div class="tweet-detail-stat likes">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                    <path
+                                        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
+                                    </path>
                                 </svg>
                                 <span id="modalLikes">0</span>
                             </div>
                             <div class="tweet-detail-stat retweets">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M23.77 15.67a.749.749 0 0 0-1.06 0l-2.22 2.22V7.65a3.755 3.755 0 0 0-3.75-3.75h-5.85a.75.75 0 0 0 0 1.5h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22a.749.749 0 1 0-1.06 1.06l3.5 3.5a.747.747 0 0 0 1.06 0l3.5-3.5a.749.749 0 0 0 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22a.752.752 0 0 0 1.062 0 .749.749 0 0 0 0-1.06l-3.5-3.5a.747.747 0 0 0-1.06 0l-3.5 3.5a.749.749 0 1 0 1.06 1.06l2.22-2.22V16.7a3.755 3.755 0 0 0 3.75 3.75h5.85a.75.75 0 0 0 0-1.5z"></path>
+                                    <path
+                                        d="M23.77 15.67a.749.749 0 0 0-1.06 0l-2.22 2.22V7.65a3.755 3.755 0 0 0-3.75-3.75h-5.85a.75.75 0 0 0 0 1.5h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22a.749.749 0 1 0-1.06 1.06l3.5 3.5a.747.747 0 0 0 1.06 0l3.5-3.5a.749.749 0 0 0 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22a.752.752 0 0 0 1.062 0 .749.749 0 0 0 0-1.06l-3.5-3.5a.747.747 0 0 0-1.06 0l-3.5 3.5a.749.749 0 1 0 1.06 1.06l2.22-2.22V16.7a3.755 3.755 0 0 0 3.75 3.75h5.85a.75.75 0 0 0 0-1.5z">
+                                    </path>
                                 </svg>
                                 <span id="modalRetweets">0</span>
                             </div>
                             <div class="tweet-detail-stat replies">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"></path>
+                                    <path
+                                        d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z">
+                                    </path>
                                 </svg>
                                 <span id="modalReplies">0</span>
                             </div>
@@ -2092,7 +2335,9 @@
                             </button>
                             <a class="tweet-detail-action-btn" id="modalOpenBtn" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"></path>
+                                    <path
+                                        d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3">
+                                    </path>
                                 </svg>
                                 Open Original Tweet
                             </a>

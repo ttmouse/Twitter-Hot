@@ -136,9 +136,53 @@ function getApiBaseUrl() {
 }
 
 function buildApiUrl(path) {
-    if (!apiBaseUrl || path.startsWith('http')) {
+    if (!apiBaseUrl) {
+        // Hybrid Mode: If we are on Vercel (or any non-local, non-VPS domain), default to VPS API
+        const host = window.location.hostname;
+        if (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('ttmouse.com')) {
+            console.log('Hybrid Mode detected: Defaulting API to https://ttmouse.com');
+            return `https://ttmouse.com/${path.replace(/^\/+/, '')}`;
+        }
         return path;
     }
+
+    // CRITICAL FIX: Force relative paths (HTTPS) for production domain
+    if (window.location.hostname === 'ttmouse.com' || window.location.hostname.endsWith('.ttmouse.com')) {
+        apiBaseUrl = '';
+        try { localStorage.removeItem('apiBaseUrl'); } catch (e) { }
+        return path;
+    }
+
+    // Auto-upgrade insecure API base if we are on HTTPS
+    if (window.location.protocol === 'https:') {
+        // Fix 1: If we are valid domain, DO NOT use IP address for API
+        if (window.location.hostname.includes('ttmouse.com')) {
+            if (apiBaseUrl && (apiBaseUrl.includes('38.55.192.139') || apiBaseUrl.includes('localhost'))) {
+                console.log('Correcting API Base URL to domain...');
+                apiBaseUrl = ''; // Use relative paths
+                localStorage.removeItem('apiBaseUrl');
+            }
+        }
+
+        // Fix 2: Upgrade HTTP to HTTPS
+        if (apiBaseUrl && apiBaseUrl.startsWith('http:')) {
+            apiBaseUrl = apiBaseUrl.replace('http:', 'https:');
+            localStorage.setItem('apiBaseUrl', apiBaseUrl);
+        }
+    }
+
+    if (path.startsWith('http')) {
+        // Fix mixed content for absolute paths in arguments
+        if (window.location.protocol === 'https:' && path.startsWith('http:')) {
+            // If absolute path is IP based, swap to domain to avoid SSL error
+            if (path.includes('38.55.192.139')) {
+                return path.replace('http:', 'https:').replace('38.55.192.139', 'ttmouse.com');
+            }
+            return path.replace('http:', 'https:');
+        }
+        return path;
+    }
+
     const base = apiBaseUrl.replace(/\/+$/, '');
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     return `${base}${cleanPath}`;
@@ -373,7 +417,7 @@ function renderTweetList(container, append = false, startIndex = 0, dateLabel = 
     // If appending, start with current DOM heights. If new, start with 0.
     const virtualColumnHeights = columns.map(col => col.offsetHeight || 0);
     // Estimated height for a tweet card (used for distribution logic)
-    const ESTIMATED_CARD_HEIGHT = 300; 
+    const ESTIMATED_CARD_HEIGHT = 300;
 
     // Helper to get next target column index
     const getNextTargetColumn = () => {
@@ -400,7 +444,7 @@ function renderTweetList(container, append = false, startIndex = 0, dateLabel = 
         const actualIndex = startIndex + index;
         // 只给前3个保留微小延迟增加动画感
         const delay = index < 3 ? index * 15 : 0;
-        const targetColumn = getNextTargetColumn(); 
+        const targetColumn = getNextTargetColumn();
 
         setTimeout(() => {
             renderTweetCard(url, actualIndex, targetColumn);
@@ -628,7 +672,7 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                     const mediaItem = images[0];
                     const imgUrl = typeof mediaItem === 'string' ? mediaItem : mediaItem.url;
                     const mediaType = typeof mediaItem === 'object' ? mediaItem.type : 'image';
-                    
+
                     let mediaHTML;
 
                     if (mediaType === 'video') {
@@ -709,7 +753,7 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     // If appending, start with current DOM heights. If new, start with 0.
     const virtualColumnHeights = columns.map(col => col.offsetHeight || 0);
     // Estimated height for a gallery item (thumb placeholder + icons)
-    const ESTIMATED_GALLERY_ITEM_HEIGHT = 200; 
+    const ESTIMATED_GALLERY_ITEM_HEIGHT = 200;
 
     // Helper to get next target column index (Shortest column first)
     const getNextTargetColumn = () => {
@@ -838,7 +882,7 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     visibleItems.forEach((url, index) => {
         const tweetIndex = startIndex + index;
         const delay = index < 4 ? index * 10 : 0; // 前4个有小延迟
-        const targetColumn = getNextTargetColumn(); 
+        const targetColumn = getNextTargetColumn();
         renderGalleryItem(url, tweetIndex, targetColumn, delay);
     });
 
@@ -2361,8 +2405,12 @@ function loadAvailableDates() {
 
                                     // After initial date is loaded, start loading remaining dates sequentially
                                     if (hasMoreDates && window.preloadSessionId === currentSession) {
-                                        console.log('[Init] Initial content loaded, preloading next 3 days...');
-                                        loadNextDate(3, currentSession);
+                                        // Initial content loaded, preload next day (reduced from 3 to 1 to avoid 429)
+                                        console.log('[Init] Initial content loaded, preloading next day...');
+                                        // Add slight delay to let initial requests clear
+                                        setTimeout(() => {
+                                            preloadNextDates(currentDateIndex, 1);
+                                        }, 2000);
                                     }
                                 } else {
                                     // No data for this date, try the next one (previous day)
@@ -2611,7 +2659,9 @@ function loadContentForDate(date, append = false, callback = null, signal = null
         // tweetMediaCache.clear(); // Persistence: Don't clear cache aggressively anymore
     }
 
-    const url = `/api/data?date=${encodeURIComponent(date)}`;
+    // Phase 2: Use new /api/tweets API
+    const formattedDate = formatDate(date);
+    const url = buildApiUrl(`api/tweets?date=${formattedDate}`);
     const startIndex = tweetUrls.length; // Save current length for append
 
     const fetchOptions = signal ? { signal } : {};
@@ -2619,20 +2669,38 @@ function loadContentForDate(date, append = false, callback = null, signal = null
     return apiFetch(url, fetchOptions)
         .then(r => {
             if (!r.ok) {
+                if (r.status === 404) {
+                    return [];
+                }
                 throw new Error(`HTTP error! status: ${r.status}`);
             }
-            // Check if response is JSON
-            const contentType = r.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return r.json();
-            } else {
-                throw new Error('Response is not JSON');
-            }
+            return r.json(); // New API returns Object Array (or fallback URL list)
         })
         .then(data => {
-            const urls = Array.isArray(data && data.urls) ? data.urls : [];
+            // New format: Array of objects {id, content, ...}, Old format: Array of URLs
+            let tweets = [];
+
+            // Normalize data
+            if (Array.isArray(data)) {
+                tweets = data.map(item => {
+                    if (typeof item === 'string') {
+                        return { id: extractTweetId(item), url: item };
+                    } else if (item && item.id) {
+                        return item;
+                    }
+                    return null;
+                }).filter(Boolean);
+            }
+
+            // Extract just the URLs for legacy processing (reverse to keep newest first)
+            // Note: New API sorts ASC (oldest first), Old API was DESC?
+            // Let's assume we maintain consistent ordering.
+            // If API returns Objects, map to URLs for tweetUrls.
+
+            const urls = tweets.map(t => t.url || `https://x.com/i/status/${t.id}`);
+
             if (urls.length > 0) {
-                // Reverse array to show newest content first
+                // Reverse array to show newest content first (Standard UI behavior)
                 const reversedUrls = urls.reverse();
                 tweetUrls.push(...reversedUrls);
 
@@ -3008,30 +3076,30 @@ async function downloadDayAsImage(button, container, dateLabel) {
             // but currently tweetUrls seems to hold the list for the "current loaded date".
             // If multiple days are loaded (infinite scroll), we need to be careful.
             // But usually the download button is per "day-section".
-            
+
             // Safer approach: Extract URLs from the container's dataset or children, 
             // BUT since we want *all* images even those not DOM-rendered (lazy load), 
             // we should try to use the data if we can match it to the date.
-            
+
             // For now, let's stick to the robust method of "what should be there".
             // If we are in infinite scroll, `tweetUrls` might have mixed dates? 
             // Looking at `loadContentForDate`, `tweetUrls` accumulates. 
             // So we should filter `tweetUrls` by date if we have the date.
             // `dateLabel` is passed in. It's formatted "MMM DD, YYYY".
             // `tweetUrls` are just URLs. We don't have date info attached to them easily unless we check cache.
-            
+
             // Let's use the DOM as the source of truth for *which tweets* belong to this section,
             // but NOT for the image data itself.
             // The container passed in is the `.day-section` or `.image-gallery-grid`.
             // We can find all placeholder items there.
-            
+
             const items = container.querySelectorAll('.tweet-embed-container, .gallery-item');
             items.forEach(item => {
                 const url = item.dataset.tweetUrl || (item.querySelector('.gallery-link-icon')?.href);
                 if (url) targetTweetUrls.push(url);
             });
         }
-        
+
         // Deduplicate
         targetTweetUrls = [...new Set(targetTweetUrls)];
         console.log(`[Download] Found ${targetTweetUrls.length} tweets to process`);

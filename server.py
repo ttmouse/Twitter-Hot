@@ -37,10 +37,27 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # New Schema: Individual Tweets
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tweets (
+                id SERIAL PRIMARY KEY,
+                tweet_id VARCHAR(50) UNIQUE NOT NULL,
+                publish_date DATE NOT NULL,
+                content TEXT,
+                media_urls JSONB,
+                author JSONB,
+                tags TEXT[],
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Index for faster date-based queries
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tweets_publish_date ON tweets(publish_date);")
+        
         conn.commit()
         cur.close()
         conn.close()
-        print("Database table initialized successfully")
+        print("Database tables initialized successfully")
     except Exception as e:
         print(f"Error initializing database: {e}")
 
@@ -99,9 +116,84 @@ class Handler(SimpleHTTPRequestHandler):
             if not conn:
                 self.send_error(500, "Database connection failed")
                 return
+            
+            # TODO: Switch to querying 'tweets' table after migration
+            # For now, keep serving from daily_tweets to avoid breaking
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT date FROM daily_tweets ORDER BY date DESC")
+                rows = cur.fetchall()
+                dates = [row[0] for row in rows]
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(dates).encode())
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching dates: {e}")
+                self.send_error(500, str(e))
+            return
+
+        # New API: Get tweets for a specific date (from new table)
+        if parsed.path == '/api/tweets':
+            query = parse_qs(parsed.query)
+            date_str = query.get('date', [''])[0]
+            
+            if not date_str:
+                self.send_error(400, "Missing date parameter")
+                return
+
+            conn = get_db_connection()
+            if not conn:
+                self.send_error(500, "Database connection failed")
+                return
 
             try:
                 cur = conn.cursor()
+                # Fetch detailed tweets for the date
+                cur.execute("""
+                    SELECT tweet_id, content, media_urls, author, tags 
+                    FROM tweets 
+                    WHERE publish_date = %s 
+                    ORDER BY created_at ASC
+                """, (date_str,))
+                
+                rows = cur.fetchall()
+                tweets = []
+                for row in rows:
+                    tweets.append({
+                        "id": row[0],
+                        "content": row[1],
+                        "media_urls": row[2],
+                        "author": row[3],
+                        "tags": row[4]
+                    })
+                
+                # FALLBACK: If new table is empty, try old table (during migration phase)
+                if not tweets:
+                    cur.execute("SELECT urls FROM daily_tweets WHERE date = %s", (date_str,))
+                    row = cur.fetchone()
+                    if row:
+                        tweets = [{"id": url.split('/')[-1], "url": url} for url in row[0]]
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(tweets).encode())
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching tweets: {e}")
+                self.send_error(500, str(e))
+            return
+                cur.close()
+                conn.close()
+            except Exception as e:
+                print(f"Error fetching tweets: {e}")
+                self.send_error(500, str(e))
+            return
                 cur.execute('SELECT date FROM daily_tweets ORDER BY date DESC')
                 rows = cur.fetchall()
                 dates = [row[0] for row in rows]

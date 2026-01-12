@@ -68,25 +68,62 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // URL 标准化函数：统一域名和协议
+  const normalize = (url) => {
+    if (!url) return '';
+    // 统一转换为 x.com 并使用 https
+    let normalized = url
+      .replace('https://twitter.com', 'https://x.com')
+      .replace('http://twitter.com', 'https://x.com')
+      .replace('http://x.com', 'https://x.com');
+    return normalized.trim();
+  };
+
   try {
     // 首先检查是否已有该日期的数据
     const existingData = await pool.query(
       'SELECT urls FROM daily_tweets WHERE date = $1',
       [date]
     );
-    
+
     let finalUrls = newUrls;
-    
+
     // 如果已有数据，则合并链接（去重）
     if (existingData.rows.length > 0) {
       const existingUrls = existingData.rows[0].urls || [];
-      // 合并现有链接和新链接，并去重
-      const mergedUrls = [...existingUrls, ...newUrls];
-      finalUrls = [...new Set(mergedUrls)]; // 使用Set进行去重
-      
+      // 合并现有链接和新链接
+      const combined = [...existingUrls, ...newUrls];
+
+      // 使用标准化后的 URL 进行去重
+      const seen = new Set();
+      const deduplicated = [];
+
+      for (const url of combined) {
+        const normalized = normalize(url);
+        if (normalized && !seen.has(normalized)) {
+          seen.add(normalized);
+          deduplicated.push(normalized); // 保存标准化后的版本
+        }
+      }
+
+      finalUrls = deduplicated;
+
       console.log(`Merging ${newUrls.length} new URLs with ${existingUrls.length} existing URLs for date ${date}`);
     } else {
-      console.log(`Creating new entry with ${newUrls.length} URLs for date ${date}`);
+      // 新数据也需要标准化和去重
+      const seen = new Set();
+      const deduplicated = [];
+
+      for (const url of newUrls) {
+        const normalized = normalize(url);
+        if (normalized && !seen.has(normalized)) {
+          seen.add(normalized);
+          deduplicated.push(normalized);
+        }
+      }
+
+      finalUrls = deduplicated;
+      console.log(`Creating new entry with ${finalUrls.length} URLs for date ${date}`);
     }
     
     // 使用 UPSERT 语法（ON CONFLICT）来插入或更新数据

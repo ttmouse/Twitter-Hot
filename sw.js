@@ -1,12 +1,12 @@
-const CACHE_NAME = 'banana-hot-v11';
-const MEDIA_CACHE_NAME = 'banana-media-v11';
+const CACHE_NAME = 'banana-hot-v12'; // Bump version to force refresh
+const MEDIA_CACHE_NAME = 'banana-media-v12';
 
 // Assets to cache immediately on install
 const PRE_CACHE_ASSETS = [
     '/',
     '/index.html',
     '/styles.css',
-    '/script.js',
+    '/app-core.js',
     '/tweet-detail-modal.js',
     '/tweet-detail-modal.css',
     '/custom-tweet-card.js',
@@ -19,6 +19,7 @@ const PRE_CACHE_ASSETS = [
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
+            console.log('[SW] Pre-caching assets...');
             return cache.addAll(PRE_CACHE_ASSETS);
         })
     );
@@ -31,6 +32,7 @@ self.addEventListener('activate', event => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME && cacheName !== MEDIA_CACHE_NAME) {
+                        console.log('[SW] Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -44,7 +46,7 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
     // 0. External Libraries Caching Strategy (Network First for fresh libraries)
-    if (url.hostname.includes('cdn.jsdelivr.net') || 
+    if (url.hostname.includes('cdn.jsdelivr.net') ||
         url.hostname.includes('unpkg.com') ||
         (url.pathname.includes('html2canvas') || url.pathname.includes('jszip'))) {
         event.respondWith(
@@ -54,13 +56,9 @@ self.addEventListener('fetch', event => {
                         cache.put(event.request, networkResponse.clone());
                         return networkResponse;
                     }
-                    
                     // If network fails, try cache as fallback
                     return cache.match(event.request);
-                }).catch(() => {
-                    // Network failed completely, try cache
-                    return cache.match(event.request);
-                });
+                }).catch(() => cache.match(event.request));
             })
         );
         return;
@@ -84,7 +82,7 @@ self.addEventListener('fetch', event => {
                         // If request requires CORS but cached response is opaque, ignore cache
                         // This prevents "opaque response ... not no-cors" errors
                         if (event.request.mode === 'cors' && response.type === 'opaque') {
-                            // Fall through to network to get a fresh CORS response
+                            // ignore opaque
                         } else {
                             return response;
                         }
@@ -117,20 +115,23 @@ self.addEventListener('fetch', event => {
             caches.open(CACHE_NAME).then(cache => {
                 // Use ignoreSearch: true to match requests like styles.css?v=10 against styles.css
                 return cache.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
+                    // Start network updates immediately
                     const fetchPromise = fetch(event.request).then(networkResponse => {
                         if (networkResponse.ok) {
                             cache.put(event.request, networkResponse.clone());
                         }
                         return networkResponse;
                     }).catch(err => {
-                        // Swallow background fetch errors if we have a cache
                         if (cachedResponse) {
                             console.warn('[SW] Background fetch failed for ' + url.pathname, err);
                             return cachedResponse; // Keep promise chain valid
                         }
+                        // If no cache and network fails, we are in trouble.
+                        // Throwing here will trigger the browser's default error page (or 404 behavior)
                         throw err;
                     });
-                    
+
+                    // Return cached response instantly if available, otherwise wait for network
                     return cachedResponse || fetchPromise;
                 });
             })

@@ -9,7 +9,9 @@
     <!-- Serif Design System Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <style>
         /* ============================================
            SERIF DESIGN SYSTEM - Admin Panel Styles
@@ -454,7 +456,7 @@
             align-items: center;
         }
 
-        .preview-mode-compact input:checked + label {
+        .preview-mode-compact input:checked+label {
             background: var(--accent);
             color: var(--accent-foreground);
             box-shadow: var(--shadow-sm);
@@ -836,9 +838,12 @@
 
         /* Pulse animation for loading state */
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.4;
             }
@@ -859,7 +864,7 @@
         }
 
         /* Ensure tweet content is above placeholder */
-        .tweet-embed-container > * {
+        .tweet-embed-container>* {
             position: relative;
             z-index: 1;
         }
@@ -871,7 +876,7 @@
         }
 
         /* Hide delete button footer by default */
-        .tweet-card-wrapper > .tweet-card-footer {
+        .tweet-card-wrapper>.tweet-card-footer {
             display: none;
         }
 
@@ -948,14 +953,14 @@
             border-color: var(--accent);
         }
 
-        .card-select-btn input[type="checkbox"]:checked + .card-select-indicator {
+        .card-select-btn input[type="checkbox"]:checked+.card-select-indicator {
             background: var(--accent);
             border-color: var(--accent);
             color: var(--accent-foreground);
             box-shadow: var(--shadow-accent);
         }
 
-        .card-select-btn input[type="checkbox"]:checked + .card-select-indicator svg {
+        .card-select-btn input[type="checkbox"]:checked+.card-select-indicator svg {
             opacity: 1;
             transform: scale(1);
             color: var(--accent-foreground);
@@ -1068,7 +1073,7 @@
             letter-spacing: 0.02em;
         }
 
-        .mode-toggle input:checked + label {
+        .mode-toggle input:checked+label {
             background: var(--accent);
             color: var(--accent-foreground);
             box-shadow: var(--shadow-sm);
@@ -1431,8 +1436,10 @@
                         </div>
                         <div class="top-bar-controls">
                             <!-- Theme Toggle (Compact) -->
-                            <button id="themeToggleCompact" class="theme-toggle-compact" aria-label="Toggle theme" title="Toggle theme">
-                                <svg id="themeIconCompact" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <button id="themeToggleCompact" class="theme-toggle-compact" aria-label="Toggle theme"
+                                title="Toggle theme">
+                                <svg id="themeIconCompact" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <!-- Sun icon (default for dark mode) -->
                                     <circle cx="12" cy="12" r="5"></circle>
                                     <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -1459,23 +1466,23 @@
             </div>
 
             <div class="main-container">
-                    <div class="preview-toolbar">
-                        <div class="preview-count-info">
-                            Detected <span id="linkCount" class="preview-count-number">0</span> links
-                        </div>
-                        <label class="select-all-wrap">
-                            <input type="checkbox" id="selectAll" checked> Select All
-                        </label>
+                <div class="preview-toolbar">
+                    <div class="preview-count-info">
+                        Detected <span id="linkCount" class="preview-count-number">0</span> links
                     </div>
-
-                    <div id="linkList" class="masonry-preview"></div>
-                    <div id="linkListImages" class="image-mode-grid" style="display: none;"></div>
+                    <label class="select-all-wrap">
+                        <input type="checkbox" id="selectAll" checked> Select All
+                    </label>
                 </div>
+
+                <div id="linkList" class="masonry-preview"></div>
+                <div id="linkListImages" class="image-mode-grid" style="display: none;"></div>
             </div>
-        </main>
+    </div>
+    </main>
     </div>
 
-    <script src="script.js"></script>
+    <script src="app-core.js"></script>
     <script>
         // ============================================
         // UTILITY FUNCTIONS
@@ -2270,7 +2277,7 @@
         }
 
         // Global retry function
-        window.retryLoadTweet = function(containerId) {
+        window.retryLoadTweet = function (containerId) {
             const container = document.getElementById(containerId);
             if (container) {
                 loadTweetEmbed(container, true);

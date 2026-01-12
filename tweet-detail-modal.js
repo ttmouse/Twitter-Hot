@@ -124,11 +124,11 @@ function openTweetDetail(data, url, index, cards) {
 
         // Check if we are over a scrollable element (specifically the text body)
         const scrollable = e.target.closest('.tweet-detail-body');
-        
+
         if (scrollable) {
             // Check if scrollable
             const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
-            
+
             if (isScrollable) {
                 // If scrolling down
                 if (direction > 0) {
@@ -136,7 +136,7 @@ function openTweetDetail(data, url, index, cards) {
                     if (scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight - 1) {
                         return; // Let default scroll happen
                     }
-                } 
+                }
                 // If scrolling up
                 else {
                     // Allow scroll if not at top
@@ -304,7 +304,7 @@ function getThumbnailHtml(cardData, card = null) {
  */
 function generateThumbnails(startIndex = 0) {
     const thumbnailStrip = document.getElementById('thumbnailStrip');
-    
+
     // Optimization: Reuse existing elements if possible instead of clearing
     // This prevents flickering when re-opening modal
     if (startIndex === 0 && thumbnailStrip.children.length !== window.visibleCards.length) {
@@ -314,20 +314,20 @@ function generateThumbnails(startIndex = 0) {
     for (let index = startIndex; index < window.visibleCards.length; index++) {
         // Skip if element already exists and matches (for incremental updates or re-runs)
         if (thumbnailStrip.children[index] && thumbnailStrip.children[index].dataset.index == index) {
-             // Just update selection state instead of recreating
-             const item = thumbnailStrip.children[index];
-             const isCurrent = index === window.currentModalIndex;
-             const card = window.visibleCards[index];
-             const checkbox = card ? card.querySelector('.tweet-check-input') : null;
-             const isSelected = checkbox && checkbox.checked;
-             
-             if (isCurrent) item.classList.add('active');
-             else item.classList.remove('active');
-             
-             if (isSelected) item.classList.remove('unselected');
-             else item.classList.add('unselected');
-             
-             continue;
+            // Just update selection state instead of recreating
+            const item = thumbnailStrip.children[index];
+            const isCurrent = index === window.currentModalIndex;
+            const card = window.visibleCards[index];
+            const checkbox = card ? card.querySelector('.tweet-check-input') : null;
+            const isSelected = checkbox && checkbox.checked;
+
+            if (isCurrent) item.classList.add('active');
+            else item.classList.remove('active');
+
+            if (isSelected) item.classList.remove('unselected');
+            else item.classList.add('unselected');
+
+            continue;
         }
 
         const card = window.visibleCards[index];
@@ -408,7 +408,7 @@ function updateThumbnailUI(index) {
     } else {
         // Content hasn't changed, only update selection overlay
         const existingSelection = thumbnailItem.querySelector('.thumbnail-item-selected');
-        
+
         if (isSelected && !existingSelection) {
             const selDiv = document.createElement('div');
             selDiv.className = 'thumbnail-item-selected';
@@ -454,13 +454,13 @@ function scrollToActiveThumbnail() {
 function scrollModalImages(direction) {
     const imagesContainer = document.getElementById('modalImages');
     if (!imagesContainer) return;
-    
+
     // Check if scrollable
     if (imagesContainer.scrollWidth <= imagesContainer.clientWidth) return;
 
     // Scroll by one page width
     const scrollAmount = imagesContainer.clientWidth;
-    
+
     imagesContainer.scrollBy({
         left: direction * scrollAmount,
         behavior: 'smooth'
@@ -626,16 +626,16 @@ function findReusableImage(index, targetUrl) {
 
     // 1. Get the card from visibleCards
     const listCard = window.visibleCards[index];
-    
+
     // 2. Identify candidate images
     let candidates = [];
-    
+
     // A. From List Card (Check all images inside)
     if (listCard) {
         const imgs = listCard.querySelectorAll('img');
         candidates.push(...Array.from(imgs));
     }
-    
+
     // B. From Thumbnail Strip
     const thumbnailStrip = document.getElementById('thumbnailStrip');
     if (thumbnailStrip) {
@@ -653,23 +653,23 @@ function findReusableImage(index, targetUrl) {
     for (const img of candidates) {
         // Skip incomplete or broken images
         if (!img.complete || img.naturalWidth === 0) continue;
-        
+
         // A. Exact match
         if (img.src === absTargetUrl) return img;
-        
+
         // B. Loose match (ignore protocol http vs https)
         if (img.src.replace(/^https?:/, '') === absTargetUrl.replace(/^https?:/, '')) return img;
 
         // C. Decoded match (handle %20 etc)
         try {
             if (decodeURIComponent(img.src) === decodeURIComponent(absTargetUrl)) return img;
-        } catch (e) {}
-        
+        } catch (e) { }
+
         // C2. Base URL match (ignore query params) - Strict than filename, looser than exact
         try {
-             if (img.src.split('?')[0] === absTargetUrl.split('?')[0]) return img;
-        } catch (e) {}
-        
+            if (img.src.split('?')[0] === absTargetUrl.split('?')[0]) return img;
+        } catch (e) { }
+
         // D. Filename match (Last resort: if filenames match and are long enough to be unique)
         // This handles cases where CDN params might differ slightly
         try {
@@ -679,7 +679,7 @@ function findReusableImage(index, targetUrl) {
                 // console.log('[Modal] Matched image by filename:', imgFile);
                 return img;
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return null;
@@ -733,7 +733,7 @@ function updateCardDisplay(index) {
         const imagesContainer = document.getElementById('modalImages');
         imagesContainer.innerHTML = '';
         imagesContainer.className = 'tweet-detail-images';
-        
+
         // Create wrapper for alignment control (Center if fits, Left if overflows)
         const imagesWrapper = document.createElement('div');
         imagesWrapper.className = 'images-wrapper';
@@ -760,7 +760,7 @@ function updateCardDisplay(index) {
 
                 if (!isVideo) {
                     let imgEl;
-                    
+
                     // Optimization: Try to clone the image from multiple sources
                     let reusableImg = findReusableImage(index, url);
 
@@ -771,77 +771,77 @@ function updateCardDisplay(index) {
                     if (idx === 0 && !reusableImg) {
                         const listCard = window.visibleCards[index];
                         if (listCard) {
-                             const fallbackImg = listCard.querySelector('img');
-                             if (fallbackImg && fallbackImg.complete && fallbackImg.naturalWidth > 0) {
-                                 console.log('[Modal] Forced placeholder from list card');
-                                 reusableImg = fallbackImg;
-                                 
-                                 // If the URLs don't match, we need to treat this as a temporary placeholder
-                                 // and still load the real high-res image in the background.
-                                 // We handle this by setting a flag or logic below.
-                             }
+                            const fallbackImg = listCard.querySelector('img');
+                            if (fallbackImg && fallbackImg.complete && fallbackImg.naturalWidth > 0) {
+                                console.log('[Modal] Forced placeholder from list card');
+                                reusableImg = fallbackImg;
+
+                                // If the URLs don't match, we need to treat this as a temporary placeholder
+                                // and still load the real high-res image in the background.
+                                // We handle this by setting a flag or logic below.
+                            }
                         }
                     }
 
                     if (reusableImg) {
                         // Clone the node to retain cached/decoded state
                         imgEl = reusableImg.cloneNode(true);
-                        
+
                         // Reset styles
-                        imgEl.className = ''; 
+                        imgEl.className = '';
                         imgEl.style.opacity = '1';
                         imgEl.style.transition = 'none';
                         imgEl.style.display = 'block';
-                        imgEl.style.width = ''; 
-                        imgEl.style.height = ''; 
+                        imgEl.style.width = '';
+                        imgEl.style.height = '';
                         imgEl.style.objectFit = 'contain';
-                        
+
                         // If we forced a placeholder that might be low-res or different, 
                         // we should check if we need to upgrade it to the high-res 'url'
                         // However, directly changing src might trigger flicker if cache misses.
                         // So we only change src if the URLs are significantly different (e.g. not just params)
                         // OR if we want to ensure high-res.
-                        
+
                         // Let's compare the source.
                         // Create anchors for normalization
                         const currentSrc = imgEl.src;
                         const targetSrc = url;
-                        
+
                         // Simple check: if they are different, we might want to upgrade
                         if (currentSrc !== targetSrc) {
-                             // But upgrading src on an existing img element causes it to go blank until load.
-                             // So we should Create a NEW img for the high res, and swap them.
-                             // OR, we just leave the low-res one if it's "Good Enough" (maybe not).
-                             
-                             // Better approach:
-                             // If it's a forced placeholder (URLs differ), we use it as a background/underlay,
-                             // and create a NEW img on top that fades in.
-                             // But `reusableImg` logic assumes we return the Final Element.
-                             
-                             // Let's refine: If reusableImg URL matches target (loosely), we assume it's good.
-                             // If it was forced (URLs differ wildly), we should probably use it BUT trigger a silent upgrade.
-                             
-                             const isLooseMatch = (
-                                currentSrc === targetSrc || 
+                            // But upgrading src on an existing img element causes it to go blank until load.
+                            // So we should Create a NEW img for the high res, and swap them.
+                            // OR, we just leave the low-res one if it's "Good Enough" (maybe not).
+
+                            // Better approach:
+                            // If it's a forced placeholder (URLs differ), we use it as a background/underlay,
+                            // and create a NEW img on top that fades in.
+                            // But `reusableImg` logic assumes we return the Final Element.
+
+                            // Let's refine: If reusableImg URL matches target (loosely), we assume it's good.
+                            // If it was forced (URLs differ wildly), we should probably use it BUT trigger a silent upgrade.
+
+                            const isLooseMatch = (
+                                currentSrc === targetSrc ||
                                 currentSrc.split('?')[0] === targetSrc.split('?')[0] ||
                                 decodeURIComponent(currentSrc) === decodeURIComponent(targetSrc)
-                             );
-                             
-                             if (!isLooseMatch) {
-                                 console.log('[Modal] Placeholder used, upgrading to high-res in background');
-                                 // It's a placeholder. We want to show it, but also load the real one.
-                                 // Strategy: Keep this imgEl visible. Create a new Image for high-res.
-                                 // When high-res loads, replace src.
-                                 const highResImg = new Image();
-                                 highResImg.src = targetSrc;
-                                 highResImg.onload = () => {
-                                     imgEl.src = targetSrc; // This might still flicker?
-                                     // No, if highResImg is loaded, browser cache should make this instant.
-                                     // But to be safe, we can just replace the node.
-                                     // Actually, if we just change src, it should be fine if preloaded.
-                                     console.log('[Modal] Upgraded to high-res');
-                                 };
-                             }
+                            );
+
+                            if (!isLooseMatch) {
+                                console.log('[Modal] Placeholder used, upgrading to high-res in background');
+                                // It's a placeholder. We want to show it, but also load the real one.
+                                // Strategy: Keep this imgEl visible. Create a new Image for high-res.
+                                // When high-res loads, replace src.
+                                const highResImg = new Image();
+                                highResImg.src = targetSrc;
+                                highResImg.onload = () => {
+                                    imgEl.src = targetSrc; // This might still flicker?
+                                    // No, if highResImg is loaded, browser cache should make this instant.
+                                    // But to be safe, we can just replace the node.
+                                    // Actually, if we just change src, it should be fine if preloaded.
+                                    console.log('[Modal] Upgraded to high-res');
+                                };
+                            }
                         }
 
                         console.log('[Modal] Cloned existing image for seamless transition');
@@ -849,13 +849,13 @@ function updateCardDisplay(index) {
                         // Standard creation (Fallback)
                         imgEl = document.createElement('img');
                         imgEl.crossOrigin = 'anonymous';
-                        
+
                         // Track start time to detect cache hits
                         const startTime = Date.now();
-                        
+
                         // Set src AFTER listeners to be safe, though for cache sync checking src first is better
                         imgEl.src = url;
-                        
+
                         // Fade in logic for new images
                         if (idx === 0) {
                             // Check immediately if it's already done (synchronous cache hit)
@@ -866,7 +866,7 @@ function updateCardDisplay(index) {
                                 // Not ready yet, prepare for fade in
                                 imgEl.style.opacity = '0';
                                 imgEl.style.transition = 'opacity 0.4s ease-out';
-                                
+
                                 // Optimization: If it loads very quickly (e.g. < 50ms), it's likely a memory/disk cache hit
                                 // that just missed the synchronous check. Skip animation for these.
                                 const originalOnLoad = imgEl.onload;
@@ -883,7 +883,7 @@ function updateCardDisplay(index) {
                                             imgEl.style.opacity = '1';
                                         }
                                     }
-                                    
+
                                     // Chain original logic
                                     if (idx === 0) {
                                         const aspectRatio = imgEl.naturalHeight / imgEl.naturalWidth;
@@ -896,12 +896,12 @@ function updateCardDisplay(index) {
                             imgEl.style.transition = 'opacity 0.4s ease-out';
                         }
                     }
-                    
+
                     // Attach onload if not already handled by the optimization above
                     if (!imgEl.onload) {
                         imgEl.onload = () => {
                             if (imgEl.style.opacity === '0') {
-                                 imgEl.style.opacity = '1';
+                                imgEl.style.opacity = '1';
                             }
                             if (idx === 0) {
                                 const aspectRatio = imgEl.naturalHeight / imgEl.naturalWidth;
@@ -909,14 +909,15 @@ function updateCardDisplay(index) {
                             }
                         };
                     }
-                    
+
                     imgEl.alt = 'Tweet image';
                     mediaWrapper.appendChild(imgEl);
                 } else {
                     // Video Handling with seamless transition
                     const videoEl = document.createElement('video');
-                    videoEl.controls = true;
-                    videoEl.preload = 'metadata'; // 'auto' might be too heavy, 'metadata' is safer
+                    // IMPORTANT: Start properly mute/unmuted based on preference? Default unmuted but user needs to interact
+                    videoEl.controls = false; // Disable controls initially so our overlay can handle the first click
+                    videoEl.preload = 'metadata';
                     videoEl.className = 'loaded';
                     videoEl.style.width = '100%';
                     videoEl.style.height = '100%';
@@ -924,50 +925,128 @@ function updateCardDisplay(index) {
                     videoEl.style.backgroundColor = '#000';
                     videoEl.style.objectFit = 'contain';
 
+                    // Critical: CSS logic for flex child to prevent collapse
+                    // Check if we can get intrinsic size or default
+                    mediaWrapper.style.flex = '0 0 auto'; // Don't shrink, auto width based on content
+                    mediaWrapper.style.minWidth = '300px'; // Minimum touch target size
+                    mediaWrapper.style.maxWidth = '100%';
+
                     if (thumbUrl) videoEl.poster = thumbUrl;
                     videoEl.src = url;
 
+                    // Append video FIRST so it's behind the overlay
+                    mediaWrapper.appendChild(videoEl);
+
                     // Optimization: Try to show a placeholder image (thumbnail) over the video
                     // until the video is ready to play. This prevents the "black box" flash.
-                    const placeholderUrl = thumbUrl || url; // Try thumb, fallback to video url (might not work for img but worth a shot if it's actually an img)
+                    const placeholderUrl = thumbUrl || url;
                     const reusableImg = findReusableImage(index, placeholderUrl);
-                    
+
                     if (reusableImg || thumbUrl) {
+                        const placeholderWrapper = document.createElement('div');
+                        placeholderWrapper.className = 'video-placeholder-wrapper';
+                        placeholderWrapper.style.position = 'absolute';
+                        placeholderWrapper.style.inset = '0';
+                        placeholderWrapper.style.zIndex = '10';
+                        placeholderWrapper.style.display = 'flex';
+                        placeholderWrapper.style.alignItems = 'center';
+                        placeholderWrapper.style.justifyContent = 'center';
+                        placeholderWrapper.style.cursor = 'pointer';
+                        placeholderWrapper.style.background = 'transparent'; // Ensure transparent bg
+
                         const placeholderImg = reusableImg ? reusableImg.cloneNode(true) : document.createElement('img');
                         if (!reusableImg) {
                             placeholderImg.src = thumbUrl;
                             placeholderImg.crossOrigin = 'anonymous';
                         }
-                        
-                        placeholderImg.className = 'video-placeholder';
+
+                        placeholderImg.className = 'video-placeholder-img';
                         placeholderImg.style.position = 'absolute';
                         placeholderImg.style.top = '0';
                         placeholderImg.style.left = '0';
                         placeholderImg.style.width = '100%';
                         placeholderImg.style.height = '100%';
                         placeholderImg.style.objectFit = 'contain';
-                        placeholderImg.style.zIndex = '10'; // Above video
-                        placeholderImg.style.pointerEvents = 'none'; // Let clicks pass through to video
+                        // IMPORTANT: Allow pointer events so we can click to play
+                        placeholderImg.style.pointerEvents = 'none'; // Let clicks pass through to wrapper/button
                         placeholderImg.style.transition = 'opacity 0.3s ease-out';
-                        
-                        mediaWrapper.appendChild(placeholderImg);
-                        
-                        // Hide placeholder when video has data
-                        const hidePlaceholder = () => {
-                            placeholderImg.style.opacity = '0';
-                            setTimeout(() => {
-                                if (placeholderImg.parentNode) placeholderImg.parentNode.removeChild(placeholderImg);
-                            }, 300);
+
+                        // Create big play button
+                        const playBtn = document.createElement('div');
+                        playBtn.className = 'video-play-btn';
+                        playBtn.innerHTML = `
+                            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 64px; height: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); pointer-events: none;">
+                                <circle cx="12" cy="12" r="10" fill="rgba(0,0,0,0.6)" stroke="white" stroke-width="1.5"></circle>
+                                <path d="M10 8l6 4-6 4V8z" fill="white"></path>
+                            </svg>
+                        `;
+                        playBtn.style.position = 'relative';
+                        playBtn.style.zIndex = '11';
+                        playBtn.style.opacity = '1';
+                        playBtn.style.transition = 'transform 0.2s ease';
+                        playBtn.style.pointerEvents = 'none'; // Click-through to wrapper for easier handling
+
+                        placeholderWrapper.appendChild(placeholderImg);
+                        placeholderWrapper.appendChild(playBtn);
+                        mediaWrapper.appendChild(placeholderWrapper);
+
+                        mediaWrapper.style.pointerEvents = 'auto'; // Ensure wrapper allows clicks
+                        mediaWrapper.style.zIndex = '5'; // Ensure it's above other elements if any
+
+                        // Click to play logic
+                        const startPlayback = (e) => {
+                            // Do NO preventDefault() to allow other necessary browser behaviors, but stop prop
+                            e.stopPropagation();
+                            console.log('[Video] Play clicked');
+
+                            // Enable controls first
+                            videoEl.controls = true;
+
+                            // Hide placeholder immediately for responsiveness
+                            placeholderWrapper.style.opacity = '0';
+                            placeholderWrapper.style.pointerEvents = 'none';
+
+                            // Start video
+                            const playPromise = videoEl.play();
+
+                            if (playPromise !== undefined) {
+                                playPromise.then(() => {
+                                    console.log('[Video] Play started successfully');
+                                    setTimeout(() => {
+                                        if (placeholderWrapper.parentNode) placeholderWrapper.parentNode.removeChild(placeholderWrapper);
+                                    }, 300);
+                                }).catch(err => {
+                                    console.error('[Video] Play failed (likely perms):', err);
+                                    // If play fails, we still want the user to see controls to try manually
+                                    if (placeholderWrapper.parentNode) placeholderWrapper.parentNode.removeChild(placeholderWrapper);
+                                    videoEl.controls = true;
+                                });
+                            }
                         };
-                        
-                        videoEl.addEventListener('canplay', hidePlaceholder);
+
+                        placeholderWrapper.addEventListener('click', startPlayback);
+                        // Redundant check: if play button somehow gets clicked despite pointer-events: none (safe fallback)
+                        playBtn.addEventListener('click', startPlayback);
+
+                        // Also hide if the video starts playing by other means
+                        const hidePlaceholder = () => {
+                            if (placeholderWrapper.parentNode) {
+                                placeholderWrapper.style.opacity = '0';
+                                setTimeout(() => {
+                                    if (placeholderWrapper.parentNode) placeholderWrapper.parentNode.removeChild(placeholderWrapper);
+                                }, 300);
+                            }
+                        };
+
                         videoEl.addEventListener('play', hidePlaceholder);
+                    } else {
+                        // No placeholder? Just ensure controls are on.
+                        videoEl.controls = true;
                     }
 
-                    mediaWrapper.appendChild(videoEl);
                     if (idx === 0) updateLayout(0.56, items.length);
                 }
-                
+
                 imagesWrapper.appendChild(mediaWrapper);
             });
 
@@ -1068,7 +1147,7 @@ async function navigateToTweet(direction) {
 
                 // Use incremental update - only add new thumbnails starting from oldCardCount
                 generateThumbnails(oldCardCount);
-                
+
                 // Trigger data fetch for the new cards so thumbnails show up
                 prefetchDataForCards(oldCardCount);
 
@@ -1087,7 +1166,7 @@ async function navigateToTweet(direction) {
 
     // Preload next date when user is near the end (last 5 cards)
     const distanceFromEnd = window.visibleCards.length - newIndex;
-    
+
     // Preload adjacent images for smoother navigation (Current +/- 2)
     const adjacentRange = 2;
     for (let i = 1; i <= adjacentRange; i++) {
@@ -1123,7 +1202,7 @@ async function navigateToTweet(direction) {
 
                         // Use incremental update - only add new thumbnails starting from oldCardCount
                         generateThumbnails(oldCardCount);
-                        
+
                         // Trigger data fetch for the new cards so thumbnails show up
                         prefetchDataForCards(oldCardCount);
                     }
@@ -1147,42 +1226,42 @@ async function navigateToTweet(direction) {
 function prefetchDataForCards(startIndex) {
     const cards = window.visibleCards;
     if (!cards || startIndex >= cards.length) return;
-    
+
     console.log('[Modal] Prefetching data for cards starting at', startIndex);
-    
+
     // Process in batches to avoid network congestion
     const BATCH_SIZE = 3;
     let currentBatchStart = startIndex;
-    
+
     const processBatch = () => {
         if (currentBatchStart >= cards.length) return;
-        
+
         const batchEnd = Math.min(currentBatchStart + BATCH_SIZE, cards.length);
         const promises = [];
-        
+
         for (let i = currentBatchStart; i < batchEnd; i++) {
             const card = cards[i];
             if (!card) continue;
-            
+
             // Skip if already has data
             if (card.dataset.tweetData || card.dataset.loading === 'finished') continue;
-            
+
             const tweetId = card.dataset.tweetId;
             if (tweetId && typeof window.fetchTweetMedia === 'function') {
                 // Fetch and update
                 const p = window.fetchTweetMedia(tweetId).then(result => {
-                     if (result.fullData) {
+                    if (result.fullData) {
                         card.dataset.tweetData = JSON.stringify(result.fullData);
                         if (result.images) card.dataset.cachedMedia = JSON.stringify(result.images);
                         card.dataset.loading = 'finished';
                         // Update UI
                         updateThumbnailUI(i);
-                     }
+                    }
                 }).catch(e => console.warn('Prefetch failed for', tweetId));
                 promises.push(p);
             }
         }
-        
+
         // Next batch after this one completes (or with small delay)
         currentBatchStart += BATCH_SIZE;
         if (promises.length > 0) {
@@ -1190,11 +1269,11 @@ function prefetchDataForCards(startIndex) {
                 setTimeout(processBatch, 100);
             });
         } else {
-             // If no requests were made (all cached), move fast
-             processBatch();
+            // If no requests were made (all cached), move fast
+            processBatch();
         }
     };
-    
+
     processBatch();
 }
 
@@ -1203,7 +1282,7 @@ function prefetchDataForCards(startIndex) {
  */
 async function preloadImageForIndex(index) {
     let cardData = getTweetDataForIndex(index);
-    
+
     // If data is missing, try to fetch it first
     if (!cardData) {
         const card = window.visibleCards[index];
@@ -1212,12 +1291,12 @@ async function preloadImageForIndex(index) {
                 // console.log('[Modal] Preloading data for index:', index);
                 const result = await window.fetchTweetMedia(card.dataset.tweetId);
                 cardData = result.fullData;
-                
+
                 // Update DOM state so future lookups work
                 card.dataset.tweetData = JSON.stringify(result.fullData);
                 if (result.images) card.dataset.cachedMedia = JSON.stringify(result.images);
                 card.dataset.loading = 'finished';
-                
+
                 // Also update thumbnail since we have data now
                 updateThumbnailUI(index);
             } catch (e) {
@@ -1230,11 +1309,11 @@ async function preloadImageForIndex(index) {
     }
 
     let urlToPreload = null;
-    
+
     // Logic must match getThumbnailHtml and updateCardDisplay
     if (cardData.media_extended && cardData.media_extended.length > 0) {
         const firstMedia = cardData.media_extended[0];
-        
+
         if (firstMedia.type === 'image') {
             urlToPreload = firstMedia.url || firstMedia.media_url_https;
         } else if (firstMedia.type === 'video' || firstMedia.type === 'animated_gif') {

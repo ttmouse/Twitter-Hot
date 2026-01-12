@@ -1,0 +1,29 @@
+#!/usr/bin/expect -f
+set timeout 600
+set host "38.55.192.139"
+set user "root"
+set password "Pf-^lM3Y=G"
+set remote_dir "/root/twitter-hot"
+
+# 1. Upload new config files and script
+puts "Uploading HTTPS configuration files..."
+spawn rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
+    nginx_ssl.conf \
+    docker-compose-ssl.yml \
+    setup_https_remote.sh \
+    $user@$host:$remote_dir/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# 2. Run remote setup script
+puts "Running remote HTTPS setup..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && bash setup_https_remote.sh"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+wait
+exit 0
