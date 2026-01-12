@@ -65,35 +65,35 @@ def init_db():
 
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
+
+    def add_cors_headers(self):
+        """Attach permissive CORS headers to the current response."""
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range')
     
     def send_json_response(self, data, status=200, cache_control='no-store'):
         """Helper to send JSON response with proper Content-Length"""
         try:
             body = json.dumps(data).encode('utf-8')
             self.send_response(status)
+            self.add_cors_headers()
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Cache-Control', cache_control)
             self.send_header('Content-Length', str(len(body)))
-            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(body)
         except Exception as e:
             print(f"Error sending response: {e}")
+    
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.add_cors_headers()
+        self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        
-        # Enable CORS PREFLIGHT for external access
-        # Note: Actual response headers are added in send_json_response or manually
-        if self.command == 'OPTIONS':
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return
         
         # Proxy endpoint for VxTwitter API (to avoid CORS)
         if path == '/api/tweet_info':
@@ -102,6 +102,8 @@ class Handler(SimpleHTTPRequestHandler):
             
             if not tweet_id:
                 self.send_response(400)
+                self.add_cors_headers()
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"missing_id"}')
                 return
@@ -118,6 +120,7 @@ class Handler(SimpleHTTPRequestHandler):
                     try:
                         json.loads(data)
                         self.send_response(200)
+                        self.add_cors_headers()
                         self.send_header('Content-Type', 'application/json')
                         self.send_header('Cache-Control', 'public, max-age=3600') # Cache for 1 hour
                         self.end_headers()
@@ -125,16 +128,22 @@ class Handler(SimpleHTTPRequestHandler):
                     except json.JSONDecodeError:
                         print(f"Invalid JSON response from upstream for tweet {tweet_id}")
                         self.send_response(502) # Bad Gateway
+                        self.add_cors_headers()
+                        self.send_header('Content-Type', 'application/json; charset=utf-8')
                         self.end_headers()
                         self.wfile.write(b'{"error":"upstream_invalid_json"}')
             except urllib.error.HTTPError as e:
                 print(f"HTTP Error fetching tweet info: {e.code} {e.reason}")
                 self.send_response(e.code)
+                self.add_cors_headers()
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"upstream_error"}')
             except Exception as e:
                 print(f"Error fetching tweet info: {e}")
                 self.send_response(500)
+                self.add_cors_headers()
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"proxy_error"}')
             return
@@ -163,7 +172,8 @@ class Handler(SimpleHTTPRequestHandler):
                     urls = row[0]
                 
                 self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                self.add_cors_headers()
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(json.dumps(urls).encode())
                 cur.close()
@@ -254,6 +264,7 @@ class Handler(SimpleHTTPRequestHandler):
             date = (qs.get('date') or [''])[0]
             if not date or not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
                 self.send_response(400)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"bad_date"}')
@@ -272,6 +283,7 @@ class Handler(SimpleHTTPRequestHandler):
                 
                 body = json.dumps({'date': date, 'urls': urls})
                 self.send_response(200)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
@@ -289,11 +301,6 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        
-        # Enable CORS
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range')
 
         if path == '/api/delete':
             length = int(self.headers.get('Content-Length') or 0)
@@ -307,6 +314,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             if not date or not re.match(r'^\d{4}-\d{2}-\d{2}$', date) or not url_to_delete:
                 self.send_response(400)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"bad_request"}')
@@ -351,6 +359,7 @@ class Handler(SimpleHTTPRequestHandler):
                      body = json.dumps({'ok': False, 'message': 'URL not found'})
 
                 self.send_response(200)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(body.encode('utf-8'))
@@ -373,6 +382,7 @@ class Handler(SimpleHTTPRequestHandler):
             
             if not date or not re.match(r'^\d{4}-\d{2}-\d{2}$', date) or not isinstance(new_urls, list):
                 self.send_response(400)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(b'{"error":"bad_request"}')
@@ -429,6 +439,7 @@ class Handler(SimpleHTTPRequestHandler):
                 })
                 
                 self.send_response(200)
+                self.add_cors_headers()
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(body.encode('utf-8'))
@@ -439,13 +450,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
             
-        # Handle OPTIONS for CORS
-        if self.command == 'OPTIONS':
-            self.send_response(200)
-            self.end_headers()
-            return
-
         self.send_response(404)
+        self.add_cors_headers()
         self.end_headers()
 
 if __name__ == '__main__':
