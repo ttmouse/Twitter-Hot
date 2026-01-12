@@ -199,6 +199,19 @@ window.buildApiUrl = buildApiUrl;
 window.getCurrentTheme = getCurrentTheme;
 window.fetchTweetMedia = fetchTweetMedia; // Expose for modal deduplication
 
+// Helper: Format Date to YYYY-MM-DD
+function formatDate(date) {
+    const d = new Date(date);
+    let month = '' + (d.getMonth() + 1);
+    let day = '' + d.getDate();
+    const year = d.getFullYear();
+
+    if (month.length < 2) month = '0' + month;
+    if (day.length < 2) day = '0' + day;
+
+    return [year, month, day].join('-');
+}
+
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         return navigator.clipboard.writeText(text);
@@ -2665,20 +2678,17 @@ function loadContentForDate(date, append = false, callback = null, signal = null
     const useNewDb = urlParams.has('test_db') || localStorage.getItem('use_new_db') === 'true';
 
     const formattedDate = formatDate(date);
-    let url;
-
+    const apiPath = useNewDb
+        ? `/api/tweets?date=${formattedDate}`
+        : `/api/daily_hot/${formattedDate}`;
     if (useNewDb) {
         console.log('[App] Using New Database API (/api/tweets)');
-        url = buildApiUrl(`api/tweets?date=${formattedDate}`);
-    } else {
-        // Default: Legacy API (Stable for Main Site)
-        url = buildApiUrl(`api/daily_hot/${formattedDate}`);
     }
     const startIndex = tweetUrls.length; // Save current length for append
 
     const fetchOptions = signal ? { signal } : {};
 
-    return apiFetch(url, fetchOptions)
+    return apiFetch(apiPath, fetchOptions)
         .then(r => {
             if (!r.ok) {
                 if (r.status === 404) {
