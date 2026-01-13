@@ -1,82 +1,18 @@
-// Extract tweet ID from URL or Object
-function extractTweetId(url) {
-    if (!url) return null;
-    if (typeof url === 'object' && url.id) return url.id;
-    const urlStr = typeof url === 'string' ? url : (url.url || '');
-    const match = urlStr.match(/status\/(\d+)/);
-    return match ? match[1] : null;
-}
-
 // Note: Theme module (js/theme.js) provides:
 // - getCurrentTheme, setThemePreference, syncBodyThemeClass, setupThemeToggle, updateThemeToggleIcon
 
 // Note: API module (js/api.js) provides:
 // - getApiBaseUrl, setApiBaseUrl, apiFetch, buildApiUrl
 
-// Legacy global exports (modules already expose these)
-window.fetchTweetMedia = fetchTweetMedia; // Expose for modal deduplication
-window.formatDate = formatDate;
+// Note: Utils module (js/utils.js) provides:
+// - extractTweetId, formatDate, copyToClipboard, showCopyFeedback, extractUrls
 
-// Helper: Format Date to YYYY-MM-DD
-function formatDate(date) {
-    const d = new Date(date);
-    let month = '' + (d.getMonth() + 1);
-    let day = '' + d.getDate();
-    const year = d.getFullYear();
+// Note: Cache module (js/cache.js) provides:
+// - LRUCache, ThrottleQueue, tweetMediaCache, throttleQueue
+// - openDB, saveToDB, getFromDB, extractImageUrlsFromTweetInfo
 
-    if (month.length < 2) month = '0' + month;
-    if (day.length < 2) day = '0' + day;
-
-    return [year, month, day].join('-');
-}
-
-function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-    }
-
-    return new Promise((resolve, reject) => {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-
-        try {
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textarea);
-            if (successful) {
-                resolve();
-            } else {
-                reject(new Error('Copy command failed'));
-            }
-        } catch (err) {
-            document.body.removeChild(textarea);
-            reject(err);
-        }
-    });
-}
-
-function showCopyFeedback(button, success) {
-    if (!button) return;
-
-    const baseLabel = button.dataset.label || 'Copy tweet link';
-    const message = success ? 'Link copied' : 'Copy failed';
-
-    button.classList.remove('copied', 'copy-failed');
-    button.classList.add(success ? 'copied' : 'copy-failed');
-    button.setAttribute('aria-label', message);
-    button.title = message;
-
-    clearTimeout(button._copyTimeout);
-    button._copyTimeout = setTimeout(() => {
-        button.classList.remove('copied', 'copy-failed');
-        button.setAttribute('aria-label', baseLabel);
-        button.title = baseLabel;
-    }, 1500);
-}
+// Legacy global exports
+window.fetchTweetMedia = fetchTweetMedia;
 
 /**
  * Fetch detailed tweet information including media
