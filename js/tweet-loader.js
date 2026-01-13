@@ -10,6 +10,7 @@ class TweetStreamLoader {
         this.hasMoreStream = true;
         this.streamStartDate = null;
         this.activeGlobalCategory = null;
+        this.activeAuthor = null;
         this.lastRenderedDateStr = null;
 
         // Scroll Management
@@ -54,11 +55,44 @@ class TweetStreamLoader {
 
             if (this.streamStartDate) url += `&date=${this.streamStartDate}`;
             if (this.activeGlobalCategory) url += `&category=${encodeURIComponent(this.activeGlobalCategory)}`;
+            if (this.activeAuthor) url += `&author=${encodeURIComponent(this.activeAuthor)}`;
 
             console.log('[Stream] Loading:', url);
 
             const res = await fetch(url);
-            if (!res.ok) throw new Error('API Error: ' + res.status);
+
+            // FALLBACK FOR 500 / OFFLINE MODE
+            if (!res.ok) {
+                console.warn(`API Error ${res.status}. Switching to Offline MOCK Mode.`);
+
+                // Generate Mock Data for visualization
+                const mockDate = this.streamStartDate || "2026-01-14";
+                const mockTweets = Array.from({ length: 10 }).map((_, i) => ({
+                    id: `mock-${Date.now()}-${i}`,
+                    content: `[Offline Mode] Mock tweet for date ${mockDate}. Verify layout and z-index. #${i}`,
+                    media_urls: [`https://picsum.photos/400/${300 + (i * 50)}`], // Random heights
+                    author: {
+                        name: "System Offline",
+                        screen_name: "admin",
+                        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=admin"
+                    },
+                    publish_date: mockDate,
+                    tags: ["mock", "test"],
+                    hierarchical: {},
+                    flat_tags: {}
+                }));
+
+                // Simulate network delay
+                await new Promise(r => setTimeout(r, 500));
+
+                this.processAndRenderTweets(mockTweets);
+
+                // Stop further loading to avoid infinite mock loops
+                this.hasMoreStream = false;
+                if (window.showToast) window.showToast('Server error. Showing mock data.', 'warning');
+                return;
+            }
+
             const tweets = await res.json();
 
             if (tweets.length === 0) {
@@ -113,13 +147,12 @@ class TweetStreamLoader {
         });
 
         // Delegate Rendering to Global Renderer
-        // (Assuming renderImageGallery is defined in app-core.js or renderer.js)
-        if (typeof window.renderImageGallery === 'function') {
+        if (window.renderer && typeof window.renderer.renderImageGallery === 'function') {
             const container = mainGrid.parentElement;
             // container, isAppend, offset, groupDate(null), items
-            window.renderImageGallery(container, true, this.streamOffset, null, preparedTweets);
+            window.renderer.renderImageGallery(container, true, this.streamOffset, null, preparedTweets);
         } else {
-            console.error('renderImageGallery not found!');
+            console.error('Renderer not found! Ensure renderer.js is loaded.');
         }
     }
 
@@ -127,11 +160,13 @@ class TweetStreamLoader {
      * Reset Stream (Filter Change)
      * @param {string|null} startDate 
      * @param {string|null} category 
+     * @param {string|null} author
      */
-    reset(startDate = null, category = null) {
+    reset(startDate = null, category = null, author = null) {
         this.streamOffset = 0;
         this.streamStartDate = startDate;
         this.activeGlobalCategory = category;
+        this.activeAuthor = author;
         this.lastRenderedDateStr = null;
         this.hasMoreStream = true;
         this.isStreamLoading = false; // Reset lock
