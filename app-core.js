@@ -634,140 +634,8 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     }
 }
 
-function fetchTweetMedia(tweetId) {
-    if (!tweetId) return Promise.resolve({ images: [], fullData: null });
+// Note: Duplicate fetchTweetMedia removed - using the version at top of file
 
-    const cached = tweetMediaCache.get(tweetId);
-    if (cached) {
-        if (cached.data) {
-            // Return both full data and images
-            return Promise.resolve({
-                images: cached.images,
-                fullData: cached.data
-            });
-        }
-        if (cached.promise) {
-            return cached.promise;
-        }
-    }
-
-    const promise = throttleQueue.add(() => apiFetch(`/api/tweet_info?id=${tweetId}`))
-        .then(res => {
-            if (!res.ok) {
-                // If 429, we might want to wait longer, but for now just throw
-                if (res.status === 429) {
-                    console.warn(`Rate limit hit for ${tweetId}, backing off...`);
-                }
-                throw new Error('Failed to fetch tweet info');
-            }
-            return res.json();
-        })
-        .then(data => {
-            const images = extractImageUrlsFromTweetInfo(data);
-            // Only update cache if our promise is still the current one (avoid race condition)
-            const currentCache = tweetMediaCache.get(tweetId);
-            if (currentCache && currentCache.promise === promise) {
-                tweetMediaCache.set(tweetId, { images, data });
-            }
-            return {
-                images,
-                fullData: data
-            };
-        })
-        .catch(error => {
-            console.error('Error fetching tweet media:', error);
-            // Only delete if our promise is still the current one (avoid race condition)
-            const currentCache = tweetMediaCache.get(tweetId);
-            if (currentCache && currentCache.promise === promise) {
-                tweetMediaCache.delete(tweetId);
-            }
-            throw error;
-        });
-
-    tweetMediaCache.set(tweetId, { promise });
-    return promise;
-}
-
-// Global Throttle Queue
-class ThrottleQueue {
-    constructor(concurrency = 1, delay = 500) {
-        this.concurrency = concurrency;
-        this.delay = delay;
-        this.queue = [];
-        this.activeCount = 0;
-        this.lastRequestTime = 0;
-    }
-
-    add(fn) {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ fn, resolve, reject });
-            this.process();
-        });
-    }
-
-    process() {
-        if (this.activeCount >= this.concurrency || this.queue.length === 0) {
-            return;
-        }
-
-        const now = Date.now();
-        const timeSinceLast = now - this.lastRequestTime;
-        const waitTime = Math.max(0, this.delay - timeSinceLast);
-
-        setTimeout(() => {
-            this.activeCount++;
-            const { fn, resolve, reject } = this.queue.shift();
-            this.lastRequestTime = Date.now();
-
-            fn().then(resolve)
-                .catch(reject)
-                .finally(() => {
-                    this.activeCount--;
-                    this.process();
-                });
-        }, waitTime);
-    }
-}
-// 1 concurrent request, 800ms delay between starts to vary gently
-const throttleQueue = new ThrottleQueue(1, 800);
-
-function extractImageUrlsFromTweetInfo(data) {
-    const images = [];
-    if (data && Array.isArray(data.media_extended)) {
-        data.media_extended.forEach(media => {
-            if (media) {
-                const url = media.url || media.media_url_https || media.thumbnail_url;
-                if (!url) return;
-
-                // 处理图片
-                if (media.type === 'image') {
-                    images.push({ url, type: 'image' });
-                }
-                // 处理视频或 GIF - 提取缩略图
-                else if (media.type === 'video' || media.type === 'animated_gif') {
-                    const thumb = media.thumbnail_url || media.url || media.media_url_https;
-                    if (thumb) {
-                        images.push({ url: thumb, type: media.type });
-                    }
-                }
-            }
-        });
-    }
-
-    // Fallback to mediaURLs if media_extended failed
-    if (images.length === 0 && data) {
-        const urls = data.mediaURLs || data.media_urls || [];
-        if (Array.isArray(urls)) {
-            urls.forEach(url => {
-                if (typeof url === 'string') {
-                    images.push({ url: url, type: 'image' });
-                }
-            });
-        }
-    }
-
-    return images;
-}
 
 function ensureImageViewer() {
     if (imageViewerEl) return imageViewerEl;
@@ -1552,54 +1420,7 @@ function getFilteredTweets() {
 
 let availableDates = [];
 
-// LRU Cache implementation for tweet media
-class LRUCache {
-    constructor(maxSize = 150) {
-        this.maxSize = maxSize;
-        this.cache = new Map();
-    }
-
-    get(key) {
-        if (!this.cache.has(key)) return undefined;
-        // Move to end (most recently used)
-        const value = this.cache.get(key);
-        this.cache.delete(key);
-        this.cache.set(key, value);
-        return value;
-    }
-
-    set(key, value) {
-        // Delete if exists (to re-insert at end)
-        if (this.cache.has(key)) {
-            this.cache.delete(key);
-        }
-        // Check size and evict oldest if needed
-        else if (this.cache.size >= this.maxSize) {
-            const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
-            console.log('[LRU Cache] Evicted oldest entry:', firstKey);
-        }
-        this.cache.set(key, value);
-    }
-
-    has(key) {
-        return this.cache.has(key);
-    }
-
-    delete(key) {
-        return this.cache.delete(key);
-    }
-
-    clear() {
-        this.cache.clear();
-    }
-
-    get size() {
-        return this.cache.size;
-    }
-}
-
-const tweetMediaCache = new LRUCache(150);
+// Note: LRUCache, tweetMediaCache, openDB, saveToDB, getFromDB moved to js/cache.js
 
 // Gallery observer instance for cleanup
 let galleryObserverInstance = null;
@@ -1613,67 +1434,10 @@ const imageViewerState = {
     index: 0
 };
 
-// Expose cache and utility function to window for modal access
-window.tweetMediaCache = tweetMediaCache;
-
-// --- IndexedDB for Persistent Metadata Storage ---
-const DB_NAME = 'BananaHotDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'tweetMedia';
-
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function saveToDB(id, data) {
-    try {
-        const db = await openDB();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put({ id, ...data });
-        return tx.complete;
-    } catch (e) {
-        console.error('[DB] Save failed:', e);
-    }
-}
-
-async function getFromDB(id) {
-    try {
-        const db = await openDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        return new Promise((resolve) => {
-            const request = store.get(id);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => resolve(null);
-        });
-    } catch (e) {
-        console.error('[DB] Get failed:', e);
-        return null;
-    }
-}
-window.extractImageUrlsFromTweetInfo = extractImageUrlsFromTweetInfo;
 
 // Global Stream State
-let streamOffset = 0;
-let streamStartDate = null; // Filter start date
-let lastRenderedDateStr = null; // For anchor insertion
-let isStreamLoading = false;
-let hasMoreStream = true;
-
 // Shared State
 let currentMode = 'stream'; // Unified mode
-let activeGlobalCategory = null;
 
 // Legacy vars preserved to prevent crashes if referenced, but unused
 let currentDateIndex = 0;
@@ -1701,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // loadAvailableDates will handle loading content for the current/latest date
         loadAvailableDates();
         setupMobileStickyNav();
-        setupInfiniteScroll();
+        window.tweetLoader = new TweetStreamLoader();
         renderCategories();
     }
 
@@ -1736,28 +1500,7 @@ function setupMobileStickyNav() {
 }
 
 // Setup infinite scroll
-function setupInfiniteScroll() {
-    let scrollTimeout;
-
-    window.addEventListener('scroll', () => {
-        // Clear previous timeout
-        clearTimeout(scrollTimeout);
-
-        // Debounce scroll events
-        scrollTimeout = setTimeout(() => {
-            // Check if user scrolled near bottom
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollHeight = document.documentElement.scrollHeight;
-            const clientHeight = document.documentElement.clientHeight;
-
-            // Load more when within 2500px of bottom (提前预加载，避免用户等待)
-            // Load more when within 2500px energy
-            if (scrollHeight - (scrollTop + clientHeight) < 2500) {
-                loadStreamBatch();
-            }
-        }, 150); // 减少debounce时间，更快响应
-    });
-}
+// Infinite scroll handled by TweetLoader
 
 /**
  * Load next date's content
@@ -2097,8 +1840,8 @@ function loadAvailableDates() {
                 renderDateTabs();
 
                 // Always start from latest - Stream Mode
-                if (availableDates.length > 0) currentDate = availableDates[0].date;
-                resetStream();
+                if (window.availableDates.length > 0) currentDate = window.availableDates[0].date;
+                if (window.tweetLoader) window.tweetLoader.reset();
             })
             .catch(error => {
                 console.error('Error loading dates:', error);
@@ -2368,156 +2111,29 @@ function showToast(message, type = 'info', duration = 3000) {
  * Core Stream Loader
  * Replaces Date-Based Loading with Quantity-Based Loading (Limit 50)
  */
-async function loadStreamBatch() {
-    if (isStreamLoading || !hasMoreStream) return;
-    isStreamLoading = true;
-    showLoadingIndicator();
-
-    try {
-        // Construct URL using buildApiUrl for Hybrid Mode support
-        let url = buildApiUrl('/api/tweets') + `?mode=stream&offset=${streamOffset}`;
-        if (streamStartDate) url += `&date=${streamStartDate}`;
-        if (activeGlobalCategory) url += `&category=${encodeURIComponent(activeGlobalCategory)}`;
-
-        console.log('[Stream] Loading:', url);
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('API Error');
-        const tweets = await res.json();
-
-        if (tweets.length === 0) {
-            hasMoreStream = false;
-            showEndOfContentMessage();
-        } else {
-            const contentList = document.getElementById('contentList');
-
-            // Check for Main Grid
-            let mainGrid = document.getElementById('main-stream-grid');
-            if (!mainGrid) {
-                // Ensure container structure
-                const container = document.createElement('div');
-                container.className = 'day-section'; // Reuse class for padding/styling
-                container.style.border = 'none';
-
-                mainGrid = document.createElement('div');
-                mainGrid.id = 'main-stream-grid';
-                mainGrid.className = 'image-gallery-grid';
-
-                container.appendChild(mainGrid);
-                contentList.appendChild(container);
-            }
-
-            // Prepare Items for Rendering
-            // We need to inject anchor ID into first item of new date
-            const preparedTweets = tweets.map(tweet => {
-                // Ensure date string comparison works
-                const pDate = tweet.publish_date; // Assuming YYYY-MM-DD
-                if (pDate && pDate !== lastRenderedDateStr) {
-                    lastRenderedDateStr = pDate;
-                    tweet._isParamsAnchor = true; // Flag for renderer
-                    tweet._anchorId = `date-anchor-${pDate}`;
-                    // Also update Sidebar Active State if visible?
-                    // IntersectionObserver handles this.
-                }
-                return tweet;
-            });
-
-            // Find parent wrapper for renderImageGallery
-            const container = mainGrid.parentElement;
-
-            // Call Render (Append mode)
-            // Note: renderImageGallery expects mixed content in 'tweets'
-            // We rely on it to append to .image-gallery-grid inside container
-            renderImageGallery(container, true, streamOffset, null, preparedTweets);
-
-            streamOffset += tweets.length;
-        }
-
-    } catch (e) {
-        console.error('Stream Error:', e);
-    } finally {
-        isStreamLoading = false;
-        hideLoadingIndicator();
-    }
-}
-
-/**
- * Reset and Load Stream
- */
-function resetStream(startDate = null, category = null) {
-    if (isStreamLoading && streamOffset > 0) {
-        // Cancel? We can't cancel fetch easily without AbortController
-        // Just proceed, race condition risks are low for now
-    }
-
-    streamOffset = 0;
-    streamStartDate = startDate;
-    activeGlobalCategory = category;
-    lastRenderedDateStr = null;
-    hasMoreStream = true;
-
-    // Clear Content
-    const contentList = document.getElementById('contentList');
-    if (contentList) contentList.innerHTML = '';
-
-    // Reset Infinite Scroll State
-    isStreamLoading = false;
-    hideLoadingIndicator();
-    const endMsg = document.getElementById('endOfContentMessage');
-    if (endMsg) endMsg.style.display = 'none';
-
-    // Update Mode Var
-    currentMode = 'stream';
-
-    // Update UI
-    if (category) {
-        updateSidebarActiveState();
-    }
-
-    // If Date Selected, Update Tabs
-    if (startDate) {
-        updateDateTabUI(startDate);
-        // Sync Mobile
-        if (typeof syncMobileNavSelection === 'function') syncMobileNavSelection(startDate);
-    } else if (category && !startDate) {
-        // Clear tabs if category mode
-        document.querySelectorAll('.date-tab.active').forEach(e => e.classList.remove('active'));
-    }
-
-    // Start Load
-    loadStreamBatch();
-}
-
-/**
- * Override Date Selection
- */
+// Adapter: Date Selection
 window.selectDateTab = function (date) {
-    // Check if anchor exists in DOM
     const anchor = document.getElementById(`date-anchor-${date}`);
     if (anchor) {
         anchor.scrollIntoView({ behavior: 'smooth' });
         updateDateTabUI(date);
     } else {
-        // Hard Reset Stream starting from Date
         console.log('[Stream] Jumping to date:', date);
-        resetStream(date, activeGlobalCategory); // Maintain category if active? Or reset?
-        // Usually Date Tab resets Category to All? 
-        // User asked for "Waterfall" -> "Quantity".
-        // Let's keep category null for Date Tabs (Timeline Mode).
+        if (window.tweetLoader) window.tweetLoader.reset(date, window.tweetLoader?.activeGlobalCategory);
     }
 }
 
-/**
- * Override Category Selection
- */
+// Adapter: Category Selection
 window.selectCategory = function (cat) {
+    if (!window.tweetLoader) return;
     console.log('[Stream] Selecting Category:', cat);
+
     if (!cat) { // All
-        resetStream(null, null); // Load latest
+        window.tweetLoader.reset(null, null);
         const dt = document.getElementById('dateTabs');
         if (dt) dt.style.display = 'flex';
     } else {
-        resetStream(null, cat);
+        window.tweetLoader.reset(null, cat);
     }
     updateSidebarActiveState();
 }
@@ -3112,7 +2728,7 @@ async function renderCategories() {
         Object.values(categoryCounts).forEach(c => totalCount += c);
 
         let html = `
-            <div class="category-item ${!activeGlobalCategory ? 'active' : ''}" onclick="selectCategory(null)" id="cat-item-all">
+            <div class="category-item ${(!window.tweetLoader || !window.tweetLoader.activeGlobalCategory) ? 'active' : ''}" onclick="selectCategory(null)" id="cat-item-all">
                 <span>All</span>
                 <span class="category-count">${totalCount}</span>
             </div>
@@ -3123,7 +2739,7 @@ async function renderCategories() {
             // Escape quotes for onclick
             const safeCat = cat.replace(/'/g, "\\'");
             html += `
-                <div class="category-item ${activeGlobalCategory === cat ? 'active' : ''}" onclick="selectCategory('${safeCat}')" id="cat-item-${cat.replace(/\s+/g, '-')}">
+                <div class="category-item ${(window.tweetLoader && window.tweetLoader.activeGlobalCategory === cat) ? 'active' : ''}" onclick="selectCategory('${safeCat}')" id="cat-item-${cat.replace(/\s+/g, '-')}">
                     <span>${cat}</span>
                     <span class="category-count">${count}</span>
                 </div>
@@ -3139,6 +2755,7 @@ async function renderCategories() {
 
 function updateSidebarActiveState() {
     document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+    const activeGlobalCategory = window.tweetLoader?.activeGlobalCategory;
     if (!activeGlobalCategory) {
         const allBtn = document.getElementById('cat-item-all');
         if (allBtn) allBtn.classList.add('active');
