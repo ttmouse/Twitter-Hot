@@ -1594,8 +1594,7 @@ setTimeout(() => {
 
 
 // Global State
-const paramDate = urlParams.get('date');
-let currentDate = (paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) ? paramDate : null; // Will be set to latest date if null
+let currentDate = null; // Will be set to latest date in loadAvailableDates
 const tweetUrls = [];
 // Category Filter State
 let activeCategory = null;
