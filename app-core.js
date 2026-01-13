@@ -12,631 +12,17 @@
 // - openDB, saveToDB, getFromDB, extractImageUrlsFromTweetInfo
 
 // Legacy global exports
-window.fetchTweetMedia = fetchTweetMedia;
+// [Refactor] Tweet rendering logic moved to js/api.js (fetchTweetMedia) and js/renderer.js (renderContent, renderImageGallery, etc.)
+// See renderer.js for TweetRenderer class.
 
-/**
- * Fetch detailed tweet information including media
- * @param {string} tweetId - Tweet ID
- * @param {AbortSignal} signal - Abort signal
- * @returns {Promise} - Resolves with {images, fullData}
- */
-function fetchTweetMedia(tweetId, signal = null) {
-    if (!tweetId) return Promise.resolve({ images: [], fullData: null });
-
-    // 1. Check in-memory cache
-    const cached = tweetMediaCache.get(tweetId);
-    if (cached) {
-        if (cached.data) return Promise.resolve({ images: cached.images, fullData: cached.data });
-        if (cached.promise) return cached.promise;
-    }
-
-    // 2. Check persistent DB storage
-    const fetchWithDB = async () => {
-        const dbResult = await getFromDB(tweetId);
-        if (dbResult) {
-            // Re-populate in-memory cache for speed
-            tweetMediaCache.set(tweetId, { images: dbResult.images, data: dbResult.fullData });
-            return { images: dbResult.images, fullData: dbResult.fullData };
-        }
-
-        // 3. Fallback to API fetch
-        const fetchOptions = signal ? { signal } : {};
-        const res = await apiFetch(`/api/tweet_info?id=${tweetId}`, fetchOptions);
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-
-        const data = await res.json();
-        const images = extractImageUrlsFromTweetInfo(data);
-
-        // Update BOTH caches
-        tweetMediaCache.set(tweetId, { images, data });
-        saveToDB(tweetId, { images, fullData: data });
-
-        return { images, fullData: data };
-    };
-
-    const promise = fetchWithDB().catch(error => {
-        if (error.name === 'AbortError') {
-            console.log('[fetchTweetMedia] Request aborted for ID:', tweetId);
-        } else {
-            console.error('[fetchTweetMedia] Error:', tweetId, error);
-        }
-        tweetMediaCache.delete(tweetId);
-        throw error;
-    });
-
-    tweetMediaCache.set(tweetId, { promise });
-    return promise;
-}
-
-// Render content based on current view mode
-function renderContent(append = false, dateLabel = null) {
-    const contentList = document.getElementById('contentList');
-    if (!contentList) return;
-
-    const currentView = 'gallery'; // Forced gallery mode
-    updateViewToggleUI(currentView);
-
-    if (!append) {
-        contentList.innerHTML = '';
-        contentList.className = 'content-list';
-    }
-
-    if (currentView === 'gallery') {
-        renderImageGallery(contentList, append, 0, dateLabel);
-    } else {
-        renderTweetList(contentList, append, 0, dateLabel);
-    }
-}
-
-// Render Standard Tweet List (Masonry) - Optimized for fast rendering
-function renderTweetList(container, append = false, startIndex = 0, dateLabel = null, explicitItems = null) {
-    // Helper function to get column count based on screen width
-    const getColumnCount = () => {
-        const width = window.innerWidth;
-        if (width <= 540) return 1;
-        if (width <= 768) return 2;
-        if (width <= 1024) return 3;
-        return 3; // Default to 3 columns for List mode (less than Gallery's 4)
-    };
-
-    // Helper function to create columns
-    const createColumns = (container) => {
-        const columnCount = getColumnCount();
-        const cols = [];
-        for (let i = 0; i < columnCount; i++) {
-            const col = document.createElement('div');
-            col.className = 'masonry-column';
-            container.appendChild(col);
-            cols.push(col);
-        }
-        return cols;
-    };
-
-    // Create new masonry grid for each day if appending
-    let masonryContainer;
-    let columns = [];
-
-    if (append) {
-        // Continue with existing masonry grid
-        masonryContainer = container.querySelector('.masonry-grid:last-child');
-
-        // Fallback if no grid exists
-        if (!masonryContainer) {
-            masonryContainer = document.createElement('div');
-            masonryContainer.className = 'masonry-grid';
-            container.appendChild(masonryContainer);
-
-            columns = createColumns(masonryContainer);
-        } else {
-            // Get existing columns
-            columns = Array.from(masonryContainer.querySelectorAll('.masonry-column'));
-        }
-    } else {
-        // Initial load: clear and create first grid
-        container.innerHTML = '';
-
-        masonryContainer = document.createElement('div');
-        masonryContainer.className = 'masonry-grid';
-        container.appendChild(masonryContainer);
-
-        // Create columns
-        columns = createColumns(masonryContainer);
-    }
-
-    // Calculate the starting tweet index for this render
-    // Use explicit items if provided (for filtering), otherwise slice from global
-    const tweetsToRender = explicitItems || tweetUrls.slice(startIndex);
-
-    // Initialize virtual column heights
-    // If appending, start with current DOM heights. If new, start with 0.
-    const virtualColumnHeights = columns.map(col => col.offsetHeight || 0);
-    // Estimated height for a tweet card (used for distribution logic)
-    const ESTIMATED_CARD_HEIGHT = 300;
-
-    // Helper to get next target column index
-    const getNextTargetColumn = () => {
-        let minHeight = Infinity;
-        let minIndex = 0;
-        for (let i = 0; i < virtualColumnHeights.length; i++) {
-            if (virtualColumnHeights[i] < minHeight) {
-                minHeight = virtualColumnHeights[i];
-                minIndex = i;
-            }
-        }
-        // Update virtual height
-        virtualColumnHeights[minIndex] += ESTIMATED_CARD_HEIGHT;
-        return columns[minIndex];
-    };
-
-    // 首屏优先策略：立即渲染前8个，其余用requestIdleCallback
-    const visibleCount = 8;
-    const visibleTweets = tweetsToRender.slice(0, visibleCount);
-    const remainingTweets = tweetsToRender.slice(visibleCount);
-
-    // 立即渲染首屏内容（前8个）
-    visibleTweets.forEach((url, index) => {
-        const actualIndex = startIndex + index;
-        // 只给前3个保留微小延迟增加动画感
-        const delay = index < 3 ? index * 15 : 0;
-        const targetColumn = getNextTargetColumn();
-
-        setTimeout(() => {
-            renderTweetCard(url, actualIndex, targetColumn);
-        }, delay);
-    });
-
-    // 使用requestIdleCallback渲染剩余内容（或降级到setTimeout）
-    const renderRemaining = () => {
-        remainingTweets.forEach((url, index) => {
-            const actualIndex = startIndex + visibleCount + index;
-            const targetColumn = getNextTargetColumn();
-            renderTweetCard(url, actualIndex, targetColumn);
-        });
-    };
-
-    if (remainingTweets.length > 0) {
-        if (window.requestIdleCallback) {
-            requestIdleCallback(renderRemaining, { timeout: 1000 });
-        } else {
-            setTimeout(renderRemaining, 100);
-        }
-    }
-}
-
-// 提取渲染单个tweet卡片的逻辑
-function renderTweetCard(item, actualIndex, targetColumn) {
-    const url = typeof item === 'string' ? item : (item.url || `https://x.com/i/status/${item.id}`);
-    const contentItem = document.createElement('div');
-    contentItem.className = 'masonry-item';
-    contentItem.style.opacity = '0';
-
-    contentItem.innerHTML = `
-        <div class="tweet-embed-container" id="tweet-container-${actualIndex}" data-tweet-url="${url}" data-tweet-index="${actualIndex}">
-            <div class="tweet-loading">
-                <div class="loading-spinner"></div>
-                <span>Loading...</span>
-            </div>
-            <div id="tweet-target-${actualIndex}"></div>
-        </div>
-    `;
-    targetColumn.appendChild(contentItem);
-
-    // Trigger fade-in animation
-    requestAnimationFrame(() => {
-        contentItem.style.transition = 'opacity 0.3s ease-out';
-        requestAnimationFrame(() => {
-            contentItem.style.opacity = '1';
-        });
-    });
-
-    // Setup observer for this specific card
-    setupLazyLoadingForTweet(contentItem.querySelector('.tweet-embed-container'));
-}
-
-// Create date separator element
-function createDateSeparator(dateStr) {
-    const separator = document.createElement('div');
-    separator.className = 'date-separator';
-
-    // Format date for display
-    const date = new Date(dateStr);
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const formattedDate = `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-
-    separator.innerHTML = `
-        <div class="date-separator-line"></div>
-        <div class="date-separator-text">${formattedDate}</div>
-        <button class="copy-day-btn" title="Download this day's content as image" aria-label="Download as image">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-        </button>
-        <div class="date-separator-line"></div>
-    `;
-
-    const copyBtn = separator.querySelector('.copy-day-btn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-            // Find the parent section which contains both the separator and the content grid
-            const targetContainer = separator.closest('.day-section');
-            if (targetContainer) {
-                downloadDayAsImage(copyBtn, targetContainer, formattedDate);
-            } else {
-                // Fallback for unexpected structure
-                const nextSibling = separator.nextElementSibling;
-                if (nextSibling && (nextSibling.classList.contains('masonry-grid') || nextSibling.classList.contains('image-gallery-grid'))) {
-                    downloadDayAsImage(copyBtn, nextSibling, formattedDate);
-                }
-            }
-        });
-    }
-
-    return separator;
-}
-
-// Render Image Gallery - Optimized for fast rendering
-function renderImageGallery(container, append = false, startIndex = 0, dateLabel = null, explicitItems = null) {
-    // Cleanup old gallery observer if not appending
-    if (!append && galleryObserverInstance) {
-        galleryObserverInstance.disconnect();
-        galleryObserverInstance = null;
-        console.log('[Gallery] Cleaned up old observer');
-    }
-
-    // Create new gallery grid for each day if appending
-    let galleryContainer;
-    let columns = [];
-
-    // Helper function to get column count based on screen width
-    const getColumnCount = () => {
-        const width = window.innerWidth;
-        if (width <= 540) return 1;
-        if (width <= 768) return 2;
-        if (width <= 1024) return 3;
-        return 4; // Default to 4 columns for wider screens
-    };
-
-    // Helper function to create columns
-    const createColumns = (container) => {
-        const columnCount = getColumnCount();
-        const cols = [];
-        for (let i = 0; i < columnCount; i++) {
-            const col = document.createElement('div');
-            col.className = 'image-gallery-column';
-            container.appendChild(col);
-            cols.push(col);
-        }
-        return cols;
-    };
-
-    // Helper function to get shortest column
-    const getShortestColumn = (cols) => {
-        return cols.reduce((shortest, col) => {
-            return col.offsetHeight < shortest.offsetHeight ? col : shortest;
-        }, cols[0]);
-    };
-
-    // Unified Grid Logic (Waterfall) - Single continuous grid
-    galleryContainer = container.querySelector('.image-gallery-grid');
-
-    if (!galleryContainer) {
-        // Create new grid
-        galleryContainer = document.createElement('div');
-        galleryContainer.className = 'image-gallery-grid';
-        container.appendChild(galleryContainer);
-        columns = createColumns(galleryContainer);
-    } else if (!append) {
-        // Reset existing grid (Preserve other elements like Separator)
-        galleryContainer.innerHTML = '';
-        columns = createColumns(galleryContainer);
-    } else {
-        // Append to existing grid
-        columns = Array.from(galleryContainer.querySelectorAll('.image-gallery-column'));
-        // Safety: if no columns found, create them
-        if (columns.length === 0) {
-            columns = createColumns(galleryContainer);
-        }
-    }
-
-    galleryObserverInstance = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
-            const wrapper = entry.target;
-            galleryObserverInstance.unobserve(wrapper);
-
-            const tweetId = wrapper.dataset.tweetId;
-            if (!tweetId) return;
-
-            const placeholder = wrapper.querySelector('.gallery-thumb-placeholder');
-            const indicator = wrapper.querySelector('.gallery-multi-indicator');
-
-            fetchTweetMedia(tweetId)
-                .then(result => {
-                    if (!placeholder) return;
-
-                    // Extract images from result (supports both old array format and new object format)
-                    const images = result?.images || result || [];
-
-                    if (!images || images.length === 0) {
-                        placeholder.innerHTML = '<div class="gallery-empty">No images found</div>';
-                        return;
-                    }
-
-                    // 始终只显示第一张图片（用户要求更快、更简洁）
-                    const mediaItem = images[0];
-                    const imgUrl = typeof mediaItem === 'string' ? mediaItem : mediaItem.url;
-                    const mediaType = typeof mediaItem === 'object' ? mediaItem.type : 'image';
-
-                    let mediaHTML;
-
-                    if (mediaType === 'video') {
-                        mediaHTML = `
-                            <div class="gallery-video-wrapper" style="position:relative;">
-                                <img src="${imgUrl}" alt="Video thumbnail" class="gallery-simple-img" style="opacity: 0;" crossOrigin="anonymous">
-                                <div class="gallery-video-indicator" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);pointer-events:none;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                                        <path d="M8 5v14l11-7z"/>
-                                    </svg>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        mediaHTML = `<img src="${imgUrl}" alt="Tweet image" class="gallery-simple-img" style="opacity: 0;" crossOrigin="anonymous">`;
-                    }
-
-                    placeholder.innerHTML = mediaHTML;
-
-                    // Sync data to dataset so modal can use it instantly without re-fetching
-                    if (result && result.fullData) {
-                        wrapper.dataset.tweetData = JSON.stringify(result.fullData);
-                        wrapper.dataset.cachedMedia = JSON.stringify(images);
-                        delete wrapper.dataset.loading;
-                        // console.log('[Gallery] Data synced to wrapper for tweetId:', tweetId);
-
-                        // Update author info
-                        const authorInfo = wrapper.querySelector('.gallery-author-info');
-                        if (authorInfo && result.fullData.user_screen_name) {
-                            const screenName = result.fullData.user_screen_name;
-                            authorInfo.innerHTML = `<a href="https://twitter.com/${screenName}" target="_blank" rel="noopener noreferrer" class="gallery-author-link">@${screenName}</a>`;
-                            authorInfo.removeAttribute('hidden');
-
-                            // Update Unimage link with correct username
-                            const unimageBtn = wrapper.querySelector('.gallery-unimage-icon');
-                            if (unimageBtn) {
-                                const tweetUrl = `https://x.com/${screenName}/status/${tweetId}`;
-                                unimageBtn.href = `https://unimage.vercel.app/?url=${encodeURIComponent(tweetUrl)}`;
-                            }
-                        }
-                    }
-
-                    // 为每张图片添加加载完成后的淡入动画
-                    const imgElements = placeholder.querySelectorAll('img');
-                    imgElements.forEach((img, i) => {
-                        const handleLoad = () => {
-                            setTimeout(() => {
-                                img.style.transition = 'opacity 0.4s ease-out';
-                                img.style.opacity = '1';
-                            }, i * 50);
-                        };
-
-                        img.onload = handleLoad;
-                        img.onerror = () => {
-                            img.style.opacity = '0.3';
-                        };
-
-                        if (img.complete && img.naturalWidth > 0) {
-                            handleLoad();
-                        }
-                    });
-
-                    // 显示总数指示器
-                    if (indicator && images.length > 1) {
-                        indicator.textContent = `${images.length}`;
-                        indicator.removeAttribute('hidden');
-                    }
-                })
-                .catch(() => {
-                    // Failed to load 这种说明帖子有问题了，优化体验：不展示这个卡片
-                    if (wrapper && wrapper.parentNode) {
-                        wrapper.remove();
-                    }
-                });
-        });
-    }, { rootMargin: '200px' });
-
-    // 首屏优先策略：立即渲染前12个
-    // Use explicit items if provided (for filtering), otherwise slice from global
-    const tweetsToRender = explicitItems || tweetUrls.slice(startIndex);
-    const visibleCount = 12;
-    const visibleItems = tweetsToRender.slice(0, visibleCount);
-    const remainingItems = tweetsToRender.slice(visibleCount);
-
-    // Initialize virtual column heights for Masonry logic
-    // If appending, start with current DOM heights. If new, start with 0.
-    const virtualColumnHeights = columns.map(col => col.offsetHeight || 0);
-    // Estimated height for a gallery item (thumb placeholder + icons)
-    const ESTIMATED_GALLERY_ITEM_HEIGHT = 200;
-
-    // Helper to get next target column index (Shortest column first)
-    const getNextTargetColumn = () => {
-        let minHeight = Infinity;
-        let minIndex = 0;
-        for (let i = 0; i < virtualColumnHeights.length; i++) {
-            if (virtualColumnHeights[i] < minHeight) {
-                minHeight = virtualColumnHeights[i];
-                minIndex = i;
-            }
-        }
-        // Update virtual height
-        virtualColumnHeights[minIndex] += ESTIMATED_GALLERY_ITEM_HEIGHT;
-        return columns[minIndex];
-    };
-
-    // 渲染单个gallery item的函数
-    const renderGalleryItem = (item, tweetIndex, targetColumn, delay = 0) => {
-        const url = typeof item === 'string' ? item : (item.url || `https://x.com/i/status/${item.id}`);
-        setTimeout(() => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'gallery-item';
-            wrapper.style.opacity = '0';
-
-            const tweetId = extractTweetId(url);
-            if (tweetId) {
-                wrapper.dataset.tweetId = tweetId;
-                wrapper.dataset.tweetIndex = tweetIndex;
-                wrapper.dataset.tweetUrl = url; // Store URL for modal navigation
-                wrapper.dataset.loading = 'true'; // Mark for modal loading logic
-
-                // Add date for anchor navigation
-                // Add date for anchor navigation
-                let targetDate = dateLabel || ((typeof currentDate !== 'undefined' && currentDate) ? currentDate : '');
-
-                // Stream Mode: Use item's own date if available
-                if (typeof item === 'object') {
-                    if (item.publish_date) targetDate = item.publish_date;
-                    if (item._anchorId) wrapper.id = item._anchorId;
-                }
-
-                if (targetDate) wrapper.dataset.date = targetDate;
-
-
-                // Check for cached media to speed up modal thumbnails
-                const cached = tweetMediaCache.get(tweetId);
-                if (cached && (cached.images || cached.data)) {
-                    if (cached.images) {
-                        wrapper.dataset.cachedMedia = JSON.stringify(cached.images);
-                    }
-                    if (cached.data) {
-                        wrapper.dataset.tweetData = JSON.stringify(cached.data);
-                        delete wrapper.dataset.loading;
-                    }
-                }
-            }
-
-            wrapper.innerHTML = `
-                <button type="button" class="gallery-thumb">
-                    <div class="gallery-multi-indicator" hidden></div>
-                    <div class="gallery-thumb-placeholder">
-                        <div class="loading-spinner small"></div>
-                    </div>
-                </button>
-                <div class="gallery-author-info" hidden></div>
-                <div class="gallery-icon-group">
-                    <button type="button"
-                        class="gallery-icon-button gallery-copy-icon"
-                        aria-label="Copy tweet link"
-                        title="Copy tweet link"
-                        data-label="Copy tweet link"
-                        data-url="${url}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M16 1H6a3 3 0 0 0-3 3v11h2V4a1 1 0 0 1 1-1h10V1zm4 4H10a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3zm1 15a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v12z"/>
-                        </svg>
-                    </button>
-                    <a href="https://unimage.vercel.app/?url=${url}"
-                        target="_blank"
-                        rel="noopener"
-                        class="gallery-icon-button gallery-unimage-icon"
-                        aria-label="Open in Unimage"
-                        title="Open in Unimage">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                    </a>
-                    <a href="${url}"
-                        target="_blank"
-                        rel="noopener"
-                        class="gallery-icon-button gallery-link-icon"
-                        aria-label="Open tweet"
-                        title="Open tweet">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                        </svg>
-                    </a>
-                </div>
-            `;
-            targetColumn.appendChild(wrapper);
-
-            // Fade in animation
-            requestAnimationFrame(() => {
-                wrapper.style.transition = 'opacity 0.3s ease-out';
-                requestAnimationFrame(() => {
-                    wrapper.style.opacity = '1';
-                });
-            });
-
-            const thumb = wrapper.querySelector('.gallery-thumb');
-            if (thumb) {
-                thumb.addEventListener('click', () => {
-                    console.log('[Gallery Click] Clicked on gallery item, tweetId:', tweetId, 'tweetIndex:', tweetIndex);
-                    if (tweetId && typeof openTweetDetail === 'function') {
-                        console.log('[Gallery Click] Opening gallery tweet detail...');
-                        openGalleryTweetDetail(tweetId, url, tweetIndex);
-                    } else if (tweetId) {
-                        console.log('[Gallery Click] Fallback to image viewer');
-                        openImageViewer(tweetId, url, tweetIndex);
-                    } else {
-                        console.log('[Gallery Click] Opening in new tab');
-                        window.open(url, '_blank');
-                    }
-                });
-            }
-
-            const copyBtn = wrapper.querySelector('.gallery-copy-icon');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const linkToCopy = copyBtn.dataset.url || url;
-                    copyToClipboard(linkToCopy)
-                        .then(() => showCopyFeedback(copyBtn, true))
-                        .catch(() => showCopyFeedback(copyBtn, false));
-                });
-            }
-
-            if (tweetId) {
-                galleryObserverInstance.observe(wrapper);
-            } else {
-                const placeholder = wrapper.querySelector('.gallery-thumb-placeholder');
-                if (placeholder) {
-                    placeholder.innerHTML = '<div class="gallery-empty">Preview unavailable</div>';
-                }
-            }
-        }, delay);
-    };
-
-    // 立即渲染首屏
-    visibleItems.forEach((url, index) => {
-        const tweetIndex = startIndex + index;
-        const delay = index < 4 ? index * 10 : 0; // 前4个有小延迟
-        const targetColumn = getNextTargetColumn();
-        renderGalleryItem(url, tweetIndex, targetColumn, delay);
-    });
-
-    // 剩余部分用requestIdleCallback
-    if (remainingItems.length > 0) {
-        const renderRemaining = () => {
-            remainingItems.forEach((url, index) => {
-                const tweetIndex = startIndex + visibleCount + index;
-                const targetColumn = getNextTargetColumn();
-                renderGalleryItem(url, tweetIndex, targetColumn, 0);
-            });
-        };
-
-        if (window.requestIdleCallback) {
-            requestIdleCallback(renderRemaining, { timeout: 1000 });
-        } else {
-            setTimeout(renderRemaining, 100);
-        }
-    }
-}
 
 // Note: Duplicate fetchTweetMedia removed - using the version at top of file
 
 
+// Global State
+let activeAuthorFilter = null;
+let activeCategory = null;
+let availableDates = [];
 function ensureImageViewer() {
     if (imageViewerEl) return imageViewerEl;
 
@@ -1099,305 +485,8 @@ function updateViewToggleUI(view) {
 }
 
 // Setup lazy loading for a single tweet
-function setupLazyLoadingForTweet(container) {
-    if (!container) return;
+// [Refactor] Lazy loading logic moved to js/renderer.js
 
-    // Check if container is already being observed or loaded
-    if (container.classList.contains('loaded') || container.classList.contains('loading')) {
-        return;
-    }
-
-    const observerOptions = {
-        root: null,
-        rootMargin: '300px', // Increased margin to start loading earlier
-        threshold: 0.01
-    };
-
-    // Create a timeout to load tweets that don't enter viewport quickly
-    const fallbackTimeout = setTimeout(() => {
-        if (!container.classList.contains('loaded') && !container.classList.contains('loading')) {
-            console.log('[Lazy Load] Fallback triggered for container:', container);
-            const url = container.getAttribute('data-tweet-url');
-            const index = parseInt(container.getAttribute('data-tweet-index'));
-            loadTweet(url, container, index);
-        }
-    }, 5000); // Load after 5 seconds even if not in viewport
-
-    // Use global observer if available, create new one if not
-    if (typeof window.tweetObserver === 'undefined') {
-        window.tweetObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && !entry.target.classList.contains('loaded') && !entry.target.classList.contains('loading')) {
-                    clearTimeout(fallbackTimeout);
-                    const container = entry.target;
-                    const url = container.getAttribute('data-tweet-url');
-                    const index = parseInt(container.getAttribute('data-tweet-index'));
-
-                    console.log('[Lazy Load] Tweet entered viewport, loading:', url);
-                    container.classList.add('loading');
-
-                    const loadingSpan = container.querySelector('.tweet-loading span');
-                    if (loadingSpan) {
-                        loadingSpan.textContent = 'Loading tweet...';
-                    }
-
-                    loadTweet(url, container, index);
-                    window.tweetObserver.unobserve(container);
-                }
-            });
-        }, observerOptions);
-    }
-
-    window.tweetObserver.observe(container);
-}
-
-// Legacy function for backward compatibility
-function setupLazyLoadingForTweets() {
-    const observerOptions = {
-        root: null,
-        rootMargin: '200px',
-        threshold: 0.01
-    };
-
-    const tweetObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting && !entry.target.classList.contains('loaded') && !entry.target.classList.contains('loading')) {
-                const container = entry.target;
-                const url = container.getAttribute('data-tweet-url');
-                const index = parseInt(container.getAttribute('data-tweet-index'));
-
-                container.classList.add('loading');
-
-                const loadingSpan = container.querySelector('.tweet-loading span');
-                if (loadingSpan) {
-                    loadingSpan.textContent = 'Loading tweet...';
-                }
-
-                loadTweet(url, container, index);
-                tweetObserver.unobserve(container);
-            }
-        });
-    }, observerOptions);
-
-    document.querySelectorAll('.tweet-embed-container').forEach(container => {
-        tweetObserver.observe(container);
-    });
-}
-
-function ensureTweetLoadingElement(container) {
-    if (!container) return null;
-    let loading = container.querySelector('.tweet-loading');
-    if (!loading) {
-        loading = document.createElement('div');
-        loading.className = 'tweet-loading';
-        loading.innerHTML = `
-            <div class="loading-spinner"></div>
-            <span>Loading...</span>
-        `;
-        container.insertBefore(loading, container.firstChild);
-    } else {
-        loading.style.display = '';
-    }
-    return loading;
-}
-
-// Global setting for using custom tweet cards
-const USE_CUSTOM_TWEET_CARDS = true; // Set to false to use Twitter widgets
-
-// Load embedded tweet using Twitter's widget or custom card
-function loadTweet(url, container, index, options = {}) {
-    const { force = false } = options;
-    // Prevent duplicate loading unless forced
-    if (!force && (container.classList.contains('loading') || container.classList.contains('loaded'))) {
-        return;
-    }
-
-    const loading = ensureTweetLoadingElement(container);
-    if (loading) {
-        const loadingSpan = loading.querySelector('span');
-        if (loadingSpan) {
-            loadingSpan.textContent = 'Loading tweet...';
-        }
-    }
-
-    container.classList.add('loading');
-    container.classList.remove('loaded');
-
-    const tweetId = extractTweetId(url);
-
-    if (!tweetId) {
-        container.innerHTML = '<p class="tweet-error">Failed to load tweet, please refresh</p>';
-        container.classList.add('loaded');
-        container.classList.remove('loading');
-        return;
-    }
-
-    // Use custom tweet cards if enabled
-    if (USE_CUSTOM_TWEET_CARDS) {
-        loadCustomTweetCard(tweetId, container);
-        return;
-    }
-
-    // Make sure target element exists and is clean
-    let target = document.getElementById(`tweet-target-${index}`);
-    if (!target) {
-        // Create target element if it doesn't exist
-        target = document.createElement('div');
-        target.id = `tweet-target-${index}`;
-        container.appendChild(target);
-    } else {
-        // Clear any existing content
-        target.innerHTML = '';
-    }
-
-    // Check if Twitter script failed to load (e.g. blocked by ad blocker)
-    if (window.twitterScriptFailed) {
-        container.innerHTML = `
-            <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 8px; opacity: 0.7;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-                </svg>
-                <p>Tweet blocked by content blocker</p>
-                <p style="font-size: 0.8rem; margin-top: 4px;">Please disable AdBlock to view tweets</p>
-            </div>
-        `;
-        container.classList.add('loaded');
-        container.classList.remove('loading');
-        return;
-    }
-
-    const renderTweet = () => {
-        const tweetTheme = getCurrentTheme();
-        // Add timeout to handle slow loading
-        const tweetLoadTimeout = setTimeout(() => {
-            if (!container.classList.contains('loaded')) {
-                container.innerHTML = `
-                    <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                        <p>Tweet loading timeout</p>
-                        <a href="${url}" target="_blank" style="color: var(--accent);">View on Twitter</a>
-                    </div>
-                `;
-                container.classList.add('loaded');
-                container.classList.remove('loading');
-            }
-        }, 15000); // 15 second timeout
-
-        window.twttr.widgets.createTweet(
-            tweetId,
-            target,
-            {
-                theme: tweetTheme,
-                dnt: true,
-                conversation: 'none',
-                cards: 'visible',
-                align: 'center',
-                width: '100%',
-                lang: 'en'
-            }
-        ).then(function (el) {
-            clearTimeout(tweetLoadTimeout);
-            // Remove loading spinner after tweet loads
-            if (loading) {
-                loading.remove();
-            }
-            if (el) {
-                container.classList.add('loaded');
-                container.classList.remove('loading');
-                // Ensure proper alignment after loading
-                container.parentElement.style.alignSelf = 'flex-start';
-            } else {
-                // Show fallback link if tweet embedding fails
-                container.innerHTML = `
-                    <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                        <p>Unable to embed tweet</p>
-                        <a href="${url}" target="_blank" style="color: var(--accent);">View on Twitter</a>
-                    </div>
-                `;
-                container.classList.add('loaded');
-                container.classList.remove('loading');
-            }
-        }).catch(function (err) {
-            clearTimeout(tweetLoadTimeout);
-            console.error('Twitter widget error:', err);
-            container.innerHTML = `
-                <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                    <p>Error loading tweet</p>
-                    <a href="${url}" target="_blank" style="color: var(--accent);">View on Twitter</a>
-                </div>
-            `;
-            container.classList.add('loaded');
-            container.classList.remove('loading');
-        });
-    };
-
-    // Load the tweet using Twitter's widget
-    if (window.twttr && window.twttr.widgets) {
-        renderTweet();
-    } else {
-        // Wait for Twitter widget to load
-        const checkTwitter = setInterval(() => {
-            if (window.twttr && window.twttr.widgets) {
-                clearInterval(checkTwitter);
-                renderTweet();
-            }
-        }, 100);
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-            clearInterval(checkTwitter);
-            if (!container.classList.contains('loaded') && container.querySelector('.tweet-loading')) {
-                container.innerHTML = `
-                    <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                        <p>Twitter widget failed to load</p>
-                        <p style="font-size: 0.8rem; margin-top: 4px;">This may be due to network issues or ad blockers</p>
-                        <a href="${url}" target="_blank" style="color: var(--accent);">View on Twitter</a>
-                    </div>
-                `;
-                container.classList.add('loaded');
-                container.classList.remove('loading');
-            }
-        }, 10000);
-    }
-}
-
-function reloadAllTweetEmbeds() {
-    if (!window.twttr || !window.twttr.widgets) {
-        return;
-    }
-
-    document.querySelectorAll('.tweet-embed-container.loaded').forEach(container => {
-        const url = container.getAttribute('data-tweet-url');
-        const index = parseInt(container.getAttribute('data-tweet-index'), 10);
-        if (!url || Number.isNaN(index)) return;
-
-        const target = document.getElementById(`tweet-target-${index}`);
-        if (target) {
-            target.innerHTML = '';
-        }
-
-        container.classList.remove('loaded');
-        container.classList.remove('loading');
-        loadTweet(url, container, index, { force: true });
-    });
-}
-
-// Function to retry failed tweet loads
-function retryFailedTweets() {
-    document.querySelectorAll('.tweet-embed-container:not(.loaded):not(.loading)').forEach(container => {
-        const url = container.getAttribute('data-tweet-url');
-        const index = parseInt(container.getAttribute('data-tweet-index'), 10);
-        if (!url || Number.isNaN(index)) return;
-
-        console.log('[Retry] Attempting to reload failed tweet:', url);
-        loadTweet(url, container, index, { force: true });
-    });
-}
-
-// Auto-retry failed tweets after a delay
-setTimeout(() => {
-    retryFailedTweets();
-}, 10000); // 10 seconds after page load
 
 
 
@@ -1405,7 +494,8 @@ setTimeout(() => {
 let currentDate = null; // Will be set to latest date in loadAvailableDates
 const tweetUrls = [];
 // Category Filter State
-let activeCategory = null;
+// Category Filter State
+// activeCategory declared at top
 
 function getFilteredTweets() {
     if (!activeCategory) return tweetUrls;
@@ -1418,7 +508,7 @@ function getFilteredTweets() {
     });
 }
 
-let availableDates = [];
+// availableDates declared at top
 
 // Note: LRUCache, tweetMediaCache, openDB, saveToDB, getFromDB moved to js/cache.js
 
@@ -1837,16 +927,41 @@ function loadAvailableDates() {
                 currentDateIndex = 0;
                 hasMoreStream = true;
 
+                window.availableDates = availableDates; // Ensure global syncing
                 renderDateTabs();
-
                 // Always start from latest - Stream Mode
-                if (window.availableDates.length > 0) currentDate = window.availableDates[0].date;
+                if (Array.isArray(window.availableDates) && window.availableDates.length > 0) currentDate = window.availableDates[0].date;
                 if (window.tweetLoader) window.tweetLoader.reset();
             })
             .catch(error => {
                 console.error('Error loading dates:', error);
-                if (retryCount < 2) setTimeout(() => fetchDates(retryCount + 1), 1000);
-                else dateTabsContainer.innerHTML = '<div class="no-dates">Failed to load dates.</div>';
+
+                // Retry logic
+                if (retryCount < 2) {
+                    setTimeout(() => fetchDates(retryCount + 1), 1000);
+                } else {
+                    // FINAL FALLBACK: Use hardcoded dates to ensure UI never breaks
+                    console.warn('API Failed. Using Fallback Dates.');
+                    const fallbackDates = [
+                        { date: '2026-01-14' },
+                        { date: '2026-01-13' },
+                        { date: '2026-01-12' },
+                        { date: '2026-01-11' }
+                    ];
+                    availableDates = fallbackDates;
+                    window.availableDates = availableDates;
+                    renderDateTabs();
+
+                    // Set current date to latest
+                    if (!currentDate && availableDates.length > 0) {
+                        currentDate = availableDates[0].date;
+                    }
+
+                    // Show error toast but keep UI functional
+                    const dateTabsContainer = document.getElementById('dateTabs');
+                    // Ensure we don't overwrite if renderDateTabs handled it, but usually renderDateTabs clears it
+                    // Actually renderDateTabs will check window.availableDates.
+                }
             });
     };
 
@@ -1855,88 +970,8 @@ function loadAvailableDates() {
 
 
 // Render date tabs
-function renderDateTabs() {
-    const dateTabsContainer = document.getElementById('dateTabs');
+// [Refactor] Date tabs logic moved to js/renderer.js
 
-    if (availableDates.length === 0) {
-        dateTabsContainer.innerHTML = '<div class="no-dates">No dates available</div>';
-        return;
-    }
-
-    dateTabsContainer.innerHTML = availableDates.map(dateInfo => {
-        // Format date for display (e.g., 12/05)
-        const date = new Date(dateInfo.date);
-        const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
-
-        return `
-            <div class="date-tab" data-date="${dateInfo.date}">
-                <div>${formattedDate}</div>
-            </div>
-        `;
-    }).join('');
-
-    // Add click event listeners to tabs
-    document.querySelectorAll('.date-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const date = tab.getAttribute('data-date');
-            currentDate = date;
-
-            // Cancel previous background loads and start a new one from new date
-            window.preloadSessionId = Date.now();
-
-            // SSOT: Manage AbortController for preloading
-            if (window.currentPreloadController) window.currentPreloadController.abort();
-            window.currentPreloadController = new AbortController();
-
-            const currentSession = window.preloadSessionId;
-            const signal = window.currentPreloadController.signal;
-
-            // Sync current index
-            const idx = availableDates.findIndex(d => d.date === date);
-            if (idx !== -1) {
-                currentDateIndex = idx;
-                console.log('[Tabs] Current date index updated to:', currentDateIndex);
-            }
-            selectDateTab(date);
-
-            // Anchor Navigation: Try to find existing content first
-            const anchorEl = document.querySelector(`.gallery-item[data-date="${date}"]`);
-            if (anchorEl) {
-                console.log('[Tabs] Anchor found, scrolling to:', date);
-                // Scroll with offset for header
-                const headerOffset = 80;
-                const elementPosition = anchorEl.getBoundingClientRect().top + window.scrollY;
-                window.scrollTo({
-                    top: elementPosition - headerOffset,
-                    behavior: 'smooth'
-                });
-
-                // Continue preloading sequence from this point if needed
-                if (window.preloadSessionId === currentSession) {
-                    loadNextDate(3, currentSession);
-                }
-            } else {
-                // Not found, perform full reload/load
-                loadContentForDate(date, false, () => {
-                    // Restart sequential preloading from new position immediately
-                    if (window.preloadSessionId === currentSession) {
-                        loadNextDate(3, currentSession);
-                    }
-                }, signal);
-            }
-
-            // Sync mobile nav selection
-            syncMobileNavSelection(date);
-
-            // Update URL parameter
-            const url = new URL(window.location);
-            url.searchParams.set('date', date);
-            window.history.replaceState({}, '', url);
-        });
-    });
-    // Sync date tabs to mobile navigation
-    syncMobileNavDates();
-}
 
 // Highlight the active date tab
 // Highlight the active date tab with Anchor Logic
@@ -1984,31 +1019,41 @@ function selectDateTab(date) {
 }
 
 // Setup ScrollSpy
+// Setup ScrollSpy (Advanced ElementFromPoint Strategy for Continuous Stream)
 function setupScrollSpy() {
-    const observer = new IntersectionObserver((entries) => {
-        // Find visible section
-        const visibleEntry = entries.find(e => e.isIntersecting);
-        if (visibleEntry) {
-            const date = visibleEntry.target.dataset.date;
-            if (date) {
-                updateDateTabUI(date);
-                syncMobileNavSelection(date);
+    let ticking = false;
+    let lastDate = null;
+
+    const checkScrollPosition = () => {
+        ticking = false;
+
+        // Sampling point: Center of screen horizontal, 150px from top (below header)
+        const x = window.innerWidth / 2;
+        const y = 150;
+
+        const el = document.elementFromPoint(x, y);
+        if (el) {
+            const item = el.closest('[data-date]');
+            if (item) {
+                const date = item.getAttribute('data-date');
+                if (date && date !== lastDate) {
+                    lastDate = date;
+                    updateDateTabUI(date);
+                    if (window.syncMobileNavSelection) syncMobileNavSelection(date);
+                }
             }
         }
-    }, {
-        rootMargin: '-10% 0px -80% 0px', // Active region near top
-        threshold: 0
-    });
-
-    // Observe function exposed to be called after rendering
-    window.observeDateSections = () => {
-        document.querySelectorAll('.day-section').forEach(section => {
-            observer.observe(section);
-        });
     };
 
-    // Initial observation
-    setTimeout(window.observeDateSections, 1000);
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(checkScrollPosition);
+            ticking = true;
+        }
+    }, { passive: true });
+
+    // Initial check
+    setTimeout(checkScrollPosition, 1000);
 }
 
 // Helper to update UI classes only
@@ -2016,10 +1061,21 @@ function updateDateTabUI(date) {
     const tabs = document.querySelectorAll('.date-tab, .mobile-date-item');
     if (tabs.length === 0) return;
 
+    let soundPlayed = false;
+
     tabs.forEach(tab => {
-        if (tab.getAttribute('data-date') === date || tab.dataset.date === date) {
+        const isTarget = tab.getAttribute('data-date') === date || tab.dataset.date === date;
+        const wasActive = tab.classList.contains('active');
+
+        if (isTarget) {
             tab.classList.add('active');
             tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+
+            // Play sound if it WAS NOT active before (change detected)
+            if (!wasActive && !soundPlayed) {
+                if (window.playDateTick) window.playDateTick();
+                soundPlayed = true; // Ensure only plays once per update
+            }
         } else {
             tab.classList.remove('active');
         }
@@ -2136,6 +1192,40 @@ window.selectCategory = function (cat) {
         window.tweetLoader.reset(null, cat);
     }
     updateSidebarActiveState();
+}
+
+// Adapter: Author Selection
+window.selectAuthor = function (author) {
+    if (!window.tweetLoader) return;
+    console.log('[Stream] Selecting Author:', author);
+
+    // Mutual Exclusion: Clear Category when selecting Author
+    // Also clear Start Date to show all history for author? Or keep date?
+    // "Like left side" -> reset everything and filter by Author.
+    if (activeAuthorFilter === author) {
+        // Toggle OFF (if clicking already active)
+        activeAuthorFilter = null;
+        window.tweetLoader.reset(null, null, null);
+    } else {
+        activeAuthorFilter = author;
+        window.tweetLoader.reset(null, null, author);
+    }
+
+    // Update UI
+    document.querySelectorAll('.author-item').forEach(el => {
+        const nameEl = el.querySelector('.author-name');
+        if (nameEl && nameEl.textContent === `@${author}`) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    });
+
+    // Clear Category UI
+    document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+    // Select "All" in categories if we are clearing category
+    const allBtn = document.getElementById('cat-item-all');
+    if (allBtn) allBtn.classList.add('active');
 }
 
 // Deprecated function stubs
@@ -2274,342 +1364,141 @@ window.testLibraries = function () {
     };
 };
 
-// 添加一个调试按钮到页面（仅在开发模式下）
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    document.addEventListener('DOMContentLoaded', () => {
-        const debugBtn = document.createElement('button');
-        debugBtn.textContent = '测试库加载';
-        debugBtn.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #333;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            z-index: 1000;
-            font-size: 12px;
-            cursor: pointer;
-        `;
-        debugBtn.addEventListener('click', () => {
-            const status = window.testLibraries();
-            const msg = document.createElement('div');
-            msg.style.cssText = `
-                position: fixed;
-                bottom: 60px;
-                right: 20px;
-                background: ${status.html2canvas && status.jszip ? '#4CAF50' : '#f44336'};
-                color: white;
-                padding: 10px;
-                border-radius: 4px;
-                z-index: 1001;
-                max-width: 300px;
-            `;
-            msg.textContent = `html2canvas: ${status.html2canvas ? '✓' : '✗'}, JSZip: ${status.jszip ? '✓' : '✗'}`;
-            document.body.appendChild(msg);
-
-            setTimeout(() => {
-                msg.remove();
-            }, 3000);
-        });
-        document.body.appendChild(debugBtn);
-    });
-}
+// Debug button removed per request
 
 // Generate image from container and download content as ZIP
-async function downloadDayAsImage(button, container, dateLabel) {
-    if (button.classList.contains('generating')) return;
+// [Refactor] moved to renderer.js and custom-tweet-card.js
 
-    // UI Feedback Helper
-    const originalIcon = button.innerHTML;
-    const updateStatus = (text) => {
-        console.log(`[Download] ${text}`);
-    };
 
-    button.classList.add('generating');
-
-    // Wait for libraries to load
-    updateStatus('Checking libraries...');
-
-    // 首先直接检查全局变量，避免不必要的等待
-    if (typeof html2canvas !== 'undefined' && typeof JSZip !== 'undefined') {
-        updateStatus('Libraries already loaded');
-    } else {
-        // 如果库未加载，尝试等待或手动加载
-        updateStatus('Loading required libraries...');
-
-        // 尝试手动加载库
-        if (!window.librariesReady) {
-            updateStatus('Attempting to load libraries...');
-            await new Promise(resolve => {
-                // 等待库加载或者超时
-                let checkCount = 0;
-                const maxChecks = 20; // 最多检查 20 次，每次间隔 500ms = 10 秒
-
-                const checkInterval = setInterval(() => {
-                    checkCount++;
-                    if ((typeof html2canvas !== 'undefined' && typeof JSZip !== 'undefined') ||
-                        window.librariesReady ||
-                        checkCount >= maxChecks) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 500);
-            });
-        }
-    }
-
-    // 最终检查库是否可用
-    if (typeof html2canvas === 'undefined' || typeof JSZip === 'undefined') {
-        // 仅在控制台输出错误信息
-        console.error('下载功能失败: Required libraries (html2canvas or JSZip) not available');
-        console.log('库加载状态:');
-        console.log('  html2canvas:', typeof html2canvas !== 'undefined' ? '✓ 已加载' : '✗ 未加载');
-        console.log('  JSZip:', typeof JSZip !== 'undefined' ? '✓ 已加载' : '✗ 未加载');
-
-        button.classList.remove('generating');
-        button.classList.add('error');
-
-        setTimeout(() => {
-            button.classList.remove('error');
-        }, 5000);
-        return;
-    }
-
-    try {
-        const zip = new JSZip();
-        // Create a folder for this date
-        // Note: Windows folders don't like colons/slashes in names, dateLabel usually safe (202x年x月x日)
-        const folderName = `NanoBanana-${dateLabel}`;
-        const folder = zip.folder(folderName);
-
-        // --- Step 1: Capture Full Screenshot ---
-        updateStatus('Capturing screenshot...');
-
-        // html2canvas configuration for cross-origin images
-        const canvas = await html2canvas(container, {
-            useCORS: true,
-            allowTaint: false, // Must be false to allow toBlob
-            backgroundColor: getComputedStyle(document.body).backgroundColor,
-            scale: 2,
-            logging: false,
-            onclone: (clonedDoc) => {
-                const clonedContainer = clonedDoc.querySelector(`.${container.className.split(' ')[0]}`);
-                if (clonedContainer) {
-                    clonedContainer.style.transform = 'none';
-                    clonedContainer.style.margin = '20px';
-                }
-            }
-        });
-
-        // Add screenshot to ZIP
-        try {
-            const screenshotBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            if (screenshotBlob) {
-                folder.file(`${folderName}-Overview.png`, screenshotBlob);
-            }
-        } catch (e) {
-            console.error('Failed to create screenshot blob:', e);
-        }
-
-        // --- Step 2: Download Individual Images ---
-        updateStatus('Fetching individual images...');
-
-        // Identify all tweets for this date
-        let targetTweetUrls = [];
-
-        // Check if we are downloading the current view's date (assuming container is related to main content)
-        // We prioritize global tweetUrls if the container matches the main list, to get ALL tweets even if not lazy-loaded
-        if (container.id === 'contentList' || container.closest('#contentList') || container.classList.contains('day-section')) {
-            // Filter tweetUrls to only include those relevant to this date if possible, 
-            // but currently tweetUrls seems to hold the list for the "current loaded date".
-            // If multiple days are loaded (infinite scroll), we need to be careful.
-            // But usually the download button is per "day-section".
-
-            // Safer approach: Extract URLs from the container's dataset or children, 
-            // BUT since we want *all* images even those not DOM-rendered (lazy load), 
-            // we should try to use the data if we can match it to the date.
-
-            // For now, let's stick to the robust method of "what should be there".
-            // If we are in infinite scroll, `tweetUrls` might have mixed dates? 
-            // Looking at `loadContentForDate`, `tweetUrls` accumulates. 
-            // So we should filter `tweetUrls` by date if we have the date.
-            // `dateLabel` is passed in. It's formatted "MMM DD, YYYY".
-            // `tweetUrls` are just URLs. We don't have date info attached to them easily unless we check cache.
-
-            // Let's use the DOM as the source of truth for *which tweets* belong to this section,
-            // but NOT for the image data itself.
-            // The container passed in is the `.day-section` or `.image-gallery-grid`.
-            // We can find all placeholder items there.
-
-            const items = container.querySelectorAll('.tweet-embed-container, .gallery-item');
-            items.forEach(item => {
-                const url = item.dataset.tweetUrl || (item.querySelector('.gallery-link-icon')?.href);
-                if (url) targetTweetUrls.push(url);
-            });
-        }
-
-        // Deduplicate
-        targetTweetUrls = [...new Set(targetTweetUrls)];
-        console.log(`[Download] Found ${targetTweetUrls.length} tweets to process`);
-
-        let imageCount = 0;
-
-        // Process tweets in batches
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < targetTweetUrls.length; i += BATCH_SIZE) {
-            const batch = targetTweetUrls.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(async (url) => {
-                const tweetId = extractTweetId(url);
-                if (!tweetId) return;
-
-                try {
-                    // Fetch media info (will use cache if available, or fetch from API)
-                    const { images } = await fetchTweetMedia(tweetId);
-                    if (!images || images.length === 0) return;
-
-                    // Download each image
-                    await Promise.all(images.map(async (mediaItem, idx) => {
-                        const imgUrl = typeof mediaItem === 'string' ? mediaItem : mediaItem.url;
-                        if (!imgUrl) return;
-
-                        try {
-                            const response = await fetch(imgUrl, { mode: 'cors' });
-                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            const blob = await response.blob();
-
-                            // Determine extension
-                            let ext = 'jpg';
-                            const contentType = response.headers.get('content-type');
-                            if (contentType) {
-                                if (contentType.includes('png')) ext = 'png';
-                                else if (contentType.includes('gif')) ext = 'gif';
-                                else if (contentType.includes('webp')) ext = 'webp';
-                            }
-
-                            const filename = `tweet_${tweetId}_${idx + 1}.${ext}`;
-                            folder.file(filename, blob);
-                            imageCount++;
-                        } catch (err) {
-                            console.warn(`Failed to download image ${imgUrl}:`, err);
-                        }
-                    }));
-                } catch (e) {
-                    console.warn(`Failed to process tweet ${tweetId}:`, e);
-                }
-            }));
-        }
-
-        updateStatus(`Added ${imageCount} images to zip`);
-
-        // --- Step 3: Generate ZIP and Download ---
-        updateStatus('Zipping...');
-
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-        // Trigger download
-        const downloadUrl = URL.createObjectURL(zipBlob);
-        const link = document.createElement('a');
-        link.download = `${folderName}.zip`;
-        link.href = downloadUrl;
-        link.click();
-
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-        handleSuccess();
-
-    } catch (err) {
-        console.error('Download workflow failed:', err);
-        button.classList.remove('generating');
-        button.classList.add('error');
-        setTimeout(() => button.classList.remove('error'), 2000);
-    }
-
-    function handleSuccess() {
-        button.classList.remove('generating');
-        button.classList.add('success');
-        button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        setTimeout(() => {
-            button.classList.remove('success');
-            button.innerHTML = originalIcon;
-        }, 2000);
-    }
-}
-
-// Load custom tweet card instead of Twitter widget
-function loadCustomTweetCard(tweetId, container) {
-    // Check if CustomTweetCard class is available
-    if (typeof window.CustomTweetCard !== 'function') {
-        console.error('CustomTweetCard class not available, falling back to default embed');
-        USE_CUSTOM_TWEET_CARDS = false;
-        return;
-    }
-
-    container.classList.add('loading');
-    container.classList.remove('loaded');
-
-    const customCard = new window.CustomTweetCard(tweetId, container);
-    customCard.load().then(() => {
-        container.classList.add('loaded');
-        container.classList.remove('loading');
-    }).catch(error => {
-        console.error('Custom tweet card failed:', error);
-        container.classList.add('loaded');
-        container.classList.remove('loading');
-
-        // Fallback to direct link
-        container.innerHTML = `
-            <div class="tweet-error" style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                <p>Unable to load tweet</p>
-                <a href="https://twitter.com/status/${tweetId}" target="_blank" style="color: var(--accent);">View on X</a>
-            </div>
-        `;
-    });
-}
-
-// Sticky Date Indicator Logic
+// Sticky Date Indicator Logic (Horizontal Line Follower)
+// Sticky Date Indicator Logic (Vertical Line & Fixed Label)
 function initFloatingDateIndicator() {
     // Create Label
-    const indicator = document.createElement('div');
-    indicator.className = 'sticky-date-indicator';
-    document.body.appendChild(indicator);
+    // Label removed per request
+    // const indicator = document.createElement('div'); ...
 
-    // Create Line (Separate element for z-index control)
+    // Create Line
     const line = document.createElement('div');
     line.className = 'sticky-date-line';
     document.body.appendChild(line);
 
+    // Audio removed (moved to global scope)
+
     let currentVisibleDate = '';
-    let scrollTimeout;
+    let isVisible = false;
+    let containerRect = null;
+    let ticking = false;
+    let lastX = 0;
+    let lastY = 0;
 
-    const updateIndicator = () => {
-        // Sample point slightly below header (avoid header overlap detection)
-        const sampleX = window.innerWidth / 2;
-        const sampleY = 200; // 200px from top
+    // Update container bounds (throttled)
+    const updateContainerBounds = () => {
+        const container = document.querySelector('.content-list') || document.querySelector('.container');
+        if (container) {
+            containerRect = container.getBoundingClientRect();
+            // User requested position in the "red box" to the left of content (Gutter).
+            // We place it to the left of the container. 
+            // Assuming label width ~80-100px.
+            // Ensure it's at least 10px from screen edge.
+            // indicator.style.left = ... (Label removed)
+        }
+    };
 
-        const el = document.elementFromPoint(sampleX, sampleY);
-        if (!el) return;
+    window.addEventListener('resize', updateContainerBounds);
+    window.addEventListener('scroll', updateContainerBounds, { passive: true });
+    setTimeout(updateContainerBounds, 1000);
 
-        const item = el.closest('[data-date]');
-        if (item) {
-            const date = item.getAttribute('data-date');
-            if (date && date !== currentVisibleDate) {
-                currentVisibleDate = date;
-                indicator.textContent = date;
-                indicator.classList.add('visible');
+    // Core Animation Loop (Performance Optimization)
+    const updateFrame = () => {
+        ticking = false;
+
+        // 1. ALWAYS Visible Strategy (User request: "Anytime needs to be visible")
+        // We do not hide based on horizontal bounds.
+
+        // 2. Find Date
+        // Strategy: 
+        // A. Check element directly under mouse.
+        // B. If not found (e.g. mouse in sidebar), probe the CENTER of the container at this Y level.
+
+        let foundDate = null;
+        let probeX = lastX;
+
+        // Try direct hit first
+        let el = document.elementFromPoint(probeX, lastY);
+        if (el) {
+            const item = el.closest('[data-date]');
+            if (item) {
+                foundDate = item.getAttribute('data-date');
+            }
+        }
+
+        // If direct hit failed, and we have a container, probe the middle of the container
+        if (!foundDate && containerRect) {
+            // Probe Center: Left + Width / 2
+            const backupX = containerRect.left + (containerRect.width / 2);
+            // Only probe if backupX is different significantly from lastX to avoid redundant check
+            if (Math.abs(backupX - lastX) > 50) {
+                el = document.elementFromPoint(backupX, lastY);
+                if (el) {
+                    const item = el.closest('[data-date]');
+                    if (item) {
+                        foundDate = item.getAttribute('data-date');
+                    }
+                }
+            }
+        }
+
+        // 3. Render
+        if (foundDate) {
+            // Update Text
+            if (foundDate !== currentVisibleDate) {
+                currentVisibleDate = foundDate;
+                try {
+                    const d = new Date(foundDate);
+                    const month = d.getMonth() + 1;
+                    const day = d.getDate();
+                    const mStr = month < 10 ? '0' + month : month;
+                    const dStr = day < 10 ? '0' + day : day;
+                    // indicator.textContent = `${d.getFullYear()}-${mStr}-${dStr}`;
+
+                    // Play Tick Sound
+                    // Sound removed from here (moved to updateDateTabUI)
+                } catch (e) {
+                    // indicator.textContent = foundDate;
+                }
+            }
+        }
+
+        // Always update position (Vertical Follow)
+        line.style.top = `${lastY}px`;
+        // indicator.style.top = `${lastY}px`;
+
+        // Always Show (if we have a currentVisibleDate context at all, or just always?)
+        // User said "Anytime visible". 
+        // We will show it if we have at least one valid date string to show, 
+        // or if we just want the line? 
+        // Let's assume we show it if we have a date. 
+        if (currentVisibleDate) {
+            if (!isVisible) {
+                // indicator.classList.add('visible');
                 line.classList.add('visible');
+                isVisible = true;
             }
         }
     };
 
-    window.addEventListener('scroll', () => {
-        if (scrollTimeout) return;
-        scrollTimeout = requestAnimationFrame(() => {
-            updateIndicator();
-            scrollTimeout = null;
-        });
+    // Input Handler
+    window.addEventListener('mousemove', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (!ticking) {
+            requestAnimationFrame(updateFrame);
+            ticking = true;
+        }
     }, { passive: true });
 }
+
+
 
 // Auto-init
 if (document.readyState === 'loading') {
@@ -2651,7 +1540,9 @@ if (document.readyState === 'loading') {
 // Author Stats & Filtering Logic
 // ==========================================
 
-let activeAuthorFilter = null;
+// Author Stats Logic
+// activeAuthorFilter moved to top of file
+// let activeAuthorFilter = null;
 
 async function initAuthorStats() {
     const listContainer = document.getElementById('authorList');
@@ -2686,9 +1577,9 @@ async function initAuthorStats() {
                 <span class="author-count">${author.count}</span>
             `;
 
-            // Click behavior: Open Twitter
+            // Click behavior: Filter by Author
             item.addEventListener('click', () => {
-                window.open(`https://x.com/${author.name}`, '_blank');
+                window.selectAuthor(author.name);
             });
 
             listContainer.appendChild(item);
@@ -2713,65 +1604,8 @@ if (document.readyState === 'loading') {
 }
 
 // Render Global Category Sidebar (Fetched from Backend)
-async function renderCategories() {
-    const listContainer = document.getElementById('categoryList');
-    if (!listContainer) return;
+// [Refactor] Category sidebar logic moved to js/renderer.js
 
-    try {
-        const res = await fetch(buildApiUrl('/api/categories'));
-        if (!res.ok) throw new Error('Failed to fetch categories');
-        const categoryCounts = await res.json(); // {"Art": 10, "Tech": 5}
-
-        let totalCount = 0;
-        const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
-        // Sum total
-        Object.values(categoryCounts).forEach(c => totalCount += c);
-
-        let html = `
-            <div class="category-item ${(!window.tweetLoader || !window.tweetLoader.activeGlobalCategory) ? 'active' : ''}" onclick="selectCategory(null)" id="cat-item-all">
-                <span>All</span>
-                <span class="category-count">${totalCount}</span>
-            </div>
-        `;
-
-        categories.forEach(cat => {
-            const count = categoryCounts[cat];
-            // Escape quotes for onclick
-            const safeCat = cat.replace(/'/g, "\\'");
-            html += `
-                <div class="category-item ${(window.tweetLoader && window.tweetLoader.activeGlobalCategory === cat) ? 'active' : ''}" onclick="selectCategory('${safeCat}')" id="cat-item-${cat.replace(/\s+/g, '-')}">
-                    <span>${cat}</span>
-                    <span class="category-count">${count}</span>
-                </div>
-            `;
-        });
-
-        listContainer.innerHTML = html;
-    } catch (e) {
-        console.error('Error rendering categories:', e);
-        listContainer.innerHTML = '<div style="padding:10px; text-align:center">Failed to load categories</div>';
-    }
-}
-
-function updateSidebarActiveState() {
-    document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
-    const activeGlobalCategory = window.tweetLoader?.activeGlobalCategory;
-    if (!activeGlobalCategory) {
-        const allBtn = document.getElementById('cat-item-all');
-        if (allBtn) allBtn.classList.add('active');
-    } else {
-        // Try to find by ID first (cleaner)
-        const safeId = 'cat-item-' + activeGlobalCategory.replace(/\s+/g, '-');
-        const btn = document.getElementById(safeId);
-        if (btn) btn.classList.add('active');
-        else {
-            // Fallback text matching
-            document.querySelectorAll('.category-item span:first-child').forEach(span => {
-                if (span.textContent === activeGlobalCategory) span.parentElement.classList.add('active');
-            });
-        }
-    }
-}
 
 
 
@@ -2781,3 +1615,34 @@ if (document.readyState === 'loading') {
 } else {
     setupScrollSpy();
 }
+
+// ==========================================
+// Global Audio (Date Ticks)
+// ==========================================
+const globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// Watch/Clock Tick Sound (Crisp Quartz/Mechanical)
+window.playDateTick = () => {
+    try {
+        if (globalAudioContext.state === 'suspended') globalAudioContext.resume();
+        const oscillator = globalAudioContext.createOscillator();
+        const gainNode = globalAudioContext.createGain();
+
+        // High frequency sine impulse
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(2000, globalAudioContext.currentTime);
+
+        // Very sharp envelope
+        gainNode.gain.setValueAtTime(0, globalAudioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.15, globalAudioContext.currentTime + 0.001);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, globalAudioContext.currentTime + 0.03);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(globalAudioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(globalAudioContext.currentTime + 0.05);
+    } catch (e) {
+        console.warn('Audio play failed', e);
+    }
+};
