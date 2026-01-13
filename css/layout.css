@@ -196,7 +196,7 @@ html.light-mode .mobile-sticky-nav {
     display: none;
 }
 
-@media (max-width: 1300px) {
+@media (max-width: 1400px) {
 
     .sidebar-right,
     .sidebar-left {

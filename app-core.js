@@ -96,8 +96,15 @@ async function openGalleryTweetDetail(tweetId, url, clickedIndex) {
     console.log('[Gallery Modal] Opening detail for tweetId:', tweetId, 'index:', clickedIndex);
 
     try {
-        // Get all Gallery cards
-        const allGalleryItems = Array.from(document.querySelectorAll('.gallery-item'));
+        // Get all Gallery cards and sort them by index to ensure correct navigation order (Left/Right)
+        // because querySelectorAll returns them in column-major order (Col 1, Col 2...)
+        const allGalleryItems = Array.from(document.querySelectorAll('.gallery-item'))
+            .sort((a, b) => {
+                const idxA = parseInt(a.dataset.tweetIndex || 0);
+                const idxB = parseInt(b.dataset.tweetIndex || 0);
+                return idxA - idxB;
+            });
+
         console.log('[Gallery Modal] Found', allGalleryItems.length, 'gallery items');
 
         if (allGalleryItems.length === 0) {
@@ -105,13 +112,23 @@ async function openGalleryTweetDetail(tweetId, url, clickedIndex) {
             throw new Error('No cards to display');
         }
 
-        // Find the clicked card index (using tweetIndex dataset or matching tweetId)
-        const finalIndex = allGalleryItems.findIndex(item =>
-            item.dataset.tweetId === tweetId || parseInt(item.dataset.tweetIndex) === clickedIndex
-        );
+        // Find the clicked card index in the SORTED array
+        // Prioritize matching by the unique tweetIndex assigned during rendering
+        let finalIndex = allGalleryItems.findIndex(item => {
+            const itemIndex = parseInt(item.dataset.tweetIndex);
+            return !isNaN(itemIndex) && itemIndex === clickedIndex;
+        });
+
+        // Fallback to tweetId matching if index match fails (e.g. legacy cards)
+        if (finalIndex === -1) {
+            console.log('[Gallery Modal] Index match failed, falling back to tweetId matching');
+            finalIndex = allGalleryItems.findIndex(item => item.dataset.tweetId === tweetId);
+        }
 
         const indexToOpen = finalIndex >= 0 ? finalIndex : 0;
         const clickedCard = allGalleryItems[indexToOpen];
+
+        console.log('[Gallery Modal] Final target index in DOM:', indexToOpen, 'of', allGalleryItems.length);
 
         // Ensure we have some initial data for the display
         let initialData = { user_name: 'Loading...' };
@@ -155,7 +172,7 @@ async function openGalleryTweetDetail(tweetId, url, clickedIndex) {
  * @param {number} range - Range to preload
  * @param {AbortSignal} signal - Abort signal
  */
-function preloadAdjacentCards(cards, currentIndex, range = 3, signal = null) {
+function preloadAdjacentCards(cards, currentIndex, range = 6, signal = null) {
     const indices = [];
 
     // Preload cards before and after current card

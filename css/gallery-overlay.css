@@ -1,0 +1,47 @@
+/* ============================
+   GALLERY CARD OVERLAY BUTTONS
+   ============================ */
+.gallery-center-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 20;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gallery-item:hover .gallery-center-btn,
+.media-wrapper:hover .gallery-center-btn {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.gallery-center-btn:hover {
+    background: rgba(29, 155, 240, 0.9);
+    /* Twitter Blue */
+    transform: translate(-50%, -50%) scale(1.1);
+    box-shadow: 0 6px 16px rgba(29, 155, 240, 0.4);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.gallery-center-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+/* Detail Button specific tweaks if needed, 
+   but generic .gallery-icon-button should handle the action bar addition */

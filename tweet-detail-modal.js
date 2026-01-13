@@ -7,6 +7,7 @@
 window.currentModalIndex = window.currentModalIndex ?? -1;
 window.visibleCards = window.visibleCards ?? [];
 window.modalKeyboardHandler = window.modalKeyboardHandler ?? null;
+window.thumbnailObserver = window.thumbnailObserver ?? null;
 window.isPreloading = window.isPreloading ?? false;
 
 // Expose updateThumbnail globally for script.js preloading access
@@ -286,6 +287,33 @@ function getThumbnailHtml(cardData, card = null) {
 function generateThumbnails(startIndex = 0) {
     const thumbnailStrip = document.getElementById('thumbnailStrip');
 
+    // Initialize observer if not exists
+    if (!window.thumbnailObserver) {
+        window.thumbnailObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const item = entry.target;
+                    const index = parseInt(item.dataset.index);
+                    if (!isNaN(index)) {
+                        // Trigger preloading/loading for this thumbnail
+                        preloadImageForIndex(index);
+                        // Once we start loading or if already loaded, we can unobserve
+                        // But wait, if it's a generic "preload", it might still show spinner.
+                        // We unobserve only if it's actually loaded or finished.
+                        const card = window.visibleCards[index];
+                        if (card && (card.dataset.tweetData || card.dataset.loading === 'finished' || card.dataset.loading === 'failed')) {
+                            window.thumbnailObserver.unobserve(item);
+                        }
+                    }
+                }
+            });
+        }, {
+            root: thumbnailStrip,
+            rootMargin: '100px', // Load slightly before they enter view
+            threshold: 0.1
+        });
+    }
+
     // Optimization: Reuse existing elements if possible instead of clearing
     // This prevents flickering when re-opening modal
     if (startIndex === 0 && thumbnailStrip.children.length !== window.visibleCards.length) {
@@ -337,6 +365,9 @@ function generateThumbnails(startIndex = 0) {
 
         thumbnailItem.addEventListener('click', () => navigateToIndex(index));
         thumbnailStrip.appendChild(thumbnailItem);
+
+        // Record for lazy loading
+        window.thumbnailObserver.observe(thumbnailItem);
     }
     scrollToActiveThumbnail();
 }
@@ -482,6 +513,13 @@ function navigateToIndex(index) {
             thumb.classList.remove('active');
         }
     });
+
+    // Ensure neighbors are preloaded for smoother navigation
+    const neighborRange = 3;
+    for (let i = 1; i <= neighborRange; i++) {
+        if (index + i < window.visibleCards.length) preloadImageForIndex(index + i);
+        if (index - i >= 0) preloadImageForIndex(index - i);
+    }
 
     // Scroll to current thumbnail
     scrollToActiveThumbnail();
@@ -1006,8 +1044,13 @@ function updateCardDisplay(index) {
                         };
 
                         placeholderWrapper.addEventListener('click', startPlayback);
-                        // Redundant check: if play button somehow gets clicked despite pointer-events: none (safe fallback)
-                        playBtn.addEventListener('click', startPlayback);
+                        // Also attach to media wrapper as backup if z-index is weird
+                        mediaWrapper.addEventListener('click', (e) => {
+                            // Only if placeholder is still visible
+                            if (placeholderWrapper.parentNode && placeholderWrapper.style.opacity !== '0') {
+                                startPlayback(e);
+                            }
+                        });
 
                         // Also hide if the video starts playing by other means
                         const hidePlaceholder = () => {
@@ -1075,20 +1118,31 @@ function updateCardDisplay(index) {
         }
 
         // Set action buttons
-        document.getElementById('modalOpenBtn').href = cardUrl;
-        document.getElementById('modalCopyBtn').onclick = async () => {
-            try {
-                await navigator.clipboard.writeText(cardUrl);
-                const btn = document.getElementById('modalCopyBtn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                }, 2000);
-            } catch (err) {
-                console.error('Copy failed:', err);
-            }
-        };
+        const modalCopyBtn = document.getElementById('modalCopyBtn');
+        const modalOpenBtn = document.getElementById('modalOpenBtn');
+        const modalUnimageBtn = document.getElementById('modalUnimageBtn');
+
+        if (modalOpenBtn) modalOpenBtn.href = cardUrl;
+
+        if (modalUnimageBtn) {
+            modalUnimageBtn.href = `https://unimage.vercel.app/?url=${encodeURIComponent(cardUrl)}`;
+            modalUnimageBtn.style.display = 'flex';
+        }
+
+        if (modalCopyBtn) {
+            modalCopyBtn.onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(cardUrl);
+                    const originalText = modalCopyBtn.innerHTML;
+                    modalCopyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color: #17bf63;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                    setTimeout(() => {
+                        modalCopyBtn.innerHTML = originalText;
+                    }, 2000);
+                } catch (err) {
+                    console.error('Copy failed:', err);
+                }
+            };
+        }
     } catch (err) {
         console.error('Failed to update main card:', err);
     }
@@ -1148,8 +1202,8 @@ async function navigateToTweet(direction) {
     // Preload next date when user is near the end (last 5 cards)
     const distanceFromEnd = window.visibleCards.length - newIndex;
 
-    // Preload adjacent images for smoother navigation (Current +/- 2)
-    const adjacentRange = 2;
+    // Preload adjacent images for smoother navigation (Current +/- 3)
+    const adjacentRange = 3;
     for (let i = 1; i <= adjacentRange; i++) {
         // Next
         const nextIdx = newIndex + i;

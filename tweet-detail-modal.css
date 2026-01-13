@@ -61,7 +61,8 @@ html.light-mode .tweet-detail-modal {
     flex: 1;
     overflow: hidden;
     display: flex;
-    flex-direction: row; /* Horizontal layout */
+    flex-direction: row;
+    /* Horizontal layout */
     box-shadow: none;
     margin: 0;
     transition: filter 0.3s ease, opacity 0.3s ease;
@@ -75,14 +76,16 @@ html.light-mode .tweet-detail-content {
 
 /* Left Column: Images */
 .tweet-detail-left-col {
-    flex: 3; /* Increase ratio to ~75% */
+    flex: 3;
+    /* Increase ratio to ~75% */
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     position: relative;
-    padding: 3rem; /* Add breathing room around the image */
+    padding: 3rem;
+    /* Add breathing room around the image */
 }
 
 html.light-mode .tweet-detail-left-col {
@@ -91,14 +94,18 @@ html.light-mode .tweet-detail-left-col {
 
 /* Right Column: Info */
 .tweet-detail-right-col {
-    width: 400px; /* Fixed width */
+    width: 400px;
+    /* Fixed width */
     min-width: 320px;
-    flex: none; /* Disable flex growth */
+    flex: none;
+    /* Disable flex growth */
     display: flex;
     flex-direction: column;
     border-left: 1px solid rgba(255, 255, 255, 0.1);
-    background: #141414; /* Darker background */
-    position: relative; /* For absolute positioning of close button if needed */
+    background: #141414;
+    /* Darker background */
+    position: relative;
+    /* For absolute positioning of close button if needed */
 }
 
 html.light-mode .tweet-detail-right-col {
@@ -109,7 +116,8 @@ html.light-mode .tweet-detail-right-col {
 /* Header Adjustments */
 .tweet-detail-header {
     padding: 1.5rem 1.5rem 1rem 1.5rem;
-    border-bottom: none; /* Minimalist look */
+    border-bottom: none;
+    /* Minimalist look */
     background: transparent;
     backdrop-filter: none;
 }
@@ -180,7 +188,8 @@ html.light-mode .tweet-detail-text {
     background: transparent;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     padding: 1rem 1.5rem;
-    margin-top: auto; /* Push to bottom */
+    margin-top: auto;
+    /* Push to bottom */
 }
 
 html.light-mode .tweet-detail-footer {
@@ -474,12 +483,15 @@ html.light-mode .tweet-detail-images {
 /* Inner wrapper for alignment control */
 .images-wrapper {
     display: flex;
-    margin: auto; /* Centers if fits, Starts if overflows */
+    margin: auto;
+    /* Centers if fits, Starts if overflows */
     height: 100%;
     align-items: center;
     gap: 1rem;
-    flex-shrink: 0; /* Prevent wrapper from shrinking below content size */
-    padding: 0 2rem; /* Add some padding so it doesn't touch edges when scrolling */
+    flex-shrink: 0;
+    /* Prevent wrapper from shrinking below content size */
+    padding: 0 2rem;
+    /* Add some padding so it doesn't touch edges when scrolling */
 }
 
 /* Base image style for transition */
@@ -506,7 +518,7 @@ html.light-mode .tweet-detail-images.single img {
 }
 
 /* Handle multiple images grid layout within the left column if needed */
-.tweet-detail-images.double, 
+.tweet-detail-images.double,
 .tweet-detail-images.multiple {
     /* justify-content handled by wrapper */
     overflow-x: auto;
@@ -620,6 +632,13 @@ html.light-mode .tweet-detail-footer {
     white-space: nowrap;
 }
 
+.tweet-detail-action-btn:empty,
+.tweet-detail-action-btn svg:only-child {
+    padding: 0.5rem;
+    width: 36px;
+    height: 36px;
+}
+
 .tweet-detail-action-btn:hover {
     background: var(--muted);
     border-color: var(--accent);
@@ -646,7 +665,8 @@ html.light-mode .tweet-detail-footer {
         flex: none;
         height: 40vh;
         width: 100%;
-        padding: 0; /* Remove padding on mobile for better visibility */
+        padding: 0;
+        /* Remove padding on mobile for better visibility */
     }
 
     .tweet-detail-right-col {

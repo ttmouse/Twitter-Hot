@@ -454,7 +454,6 @@ html.light-mode .view-btn.active {
 .gallery-thumb img {
     width: 100%;
     display: block;
-    vertical-align: bottom;
 }
 
 /* Simple 1-Image fallback */
@@ -1004,7 +1003,8 @@ body.viewer-open {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 8px 10px;
+    gap: 8px;
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.2s;
@@ -1030,6 +1030,21 @@ body.viewer-open {
     background: var(--bg-card);
     padding: 2px 8px;
     border-radius: 10px;
+}
+
+.category-item.child {
+    padding-left: 28px;
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+.category-item.child:hover {
+    opacity: 1;
+}
+
+.category-item.child.active {
+    opacity: 1;
+    border-left: 3px solid var(--accent-primary);
 }
 
 .author-name {

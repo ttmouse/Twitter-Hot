@@ -118,3 +118,59 @@ window.getApiBaseUrl = getApiBaseUrl;
 window.setApiBaseUrl = setApiBaseUrl;
 window.apiFetch = apiFetch;
 window.buildApiUrl = buildApiUrl;
+
+/**
+ * Fetch detailed tweet information including media
+ * @param {string} tweetId - Tweet ID
+ * @param {AbortSignal} signal - Abort signal
+ * @returns {Promise} - Resolves with {images, fullData}
+ */
+async function fetchTweetMedia(tweetId, signal = null) {
+    if (!tweetId) return Promise.resolve({ images: [], fullData: null });
+
+    // 1. Check in-memory cache (Assume tweetMediaCache is global from cache.js)
+    const cached = window.tweetMediaCache.get(tweetId);
+    if (cached) {
+        if (cached.data) return Promise.resolve({ images: cached.images, fullData: cached.data });
+        if (cached.promise) return cached.promise;
+    }
+
+    // 2. Check persistent DB storage
+    const fetchWithDB = async () => {
+        const dbResult = await window.getFromDB(tweetId);
+        if (dbResult) {
+            // Re-populate in-memory cache for speed
+            window.tweetMediaCache.set(tweetId, { images: dbResult.images, data: dbResult.fullData });
+            return { images: dbResult.images, fullData: dbResult.fullData };
+        }
+
+        // 3. Fallback to API fetch
+        const fetchOptions = signal ? { signal } : {};
+        const res = await apiFetch(`/api/tweet_info?id=${tweetId}`, fetchOptions);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+        const data = await res.json();
+        const images = window.extractImageUrlsFromTweetInfo(data);
+
+        // Update BOTH caches
+        window.tweetMediaCache.set(tweetId, { images, data });
+        window.saveToDB(tweetId, { images, fullData: data });
+
+        return { images, fullData: data };
+    };
+
+    const promise = fetchWithDB().catch(error => {
+        if (error.name === 'AbortError') {
+            console.log('[fetchTweetMedia] Request aborted for ID:', tweetId);
+        } else {
+            console.error('[fetchTweetMedia] Error:', tweetId, error);
+        }
+        window.tweetMediaCache.delete(tweetId);
+        throw error;
+    });
+
+    window.tweetMediaCache.set(tweetId, { promise });
+    return promise;
+}
+
+window.fetchTweetMedia = fetchTweetMedia;
