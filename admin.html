@@ -1501,8 +1501,13 @@
         }
 
         // API fetch wrapper
+        // Use new server for production, relative path for local dev
+        const API_BASE = window.location.hostname === 'localhost'
+            ? ''
+            : 'http://38.55.192.139:5502';
+
         async function apiFetch(url, options = {}) {
-            return fetch(url, options);
+            return fetch(API_BASE + url, options);
         }
 
         // Save daily snapshot
