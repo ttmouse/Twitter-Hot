@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分类数据导入 - Tweet Classification Import</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent-color: #7c3aed;
+            --success-color: #3fb950;
+            --error-color: #ff7b72;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        #status {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .result-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .result-box.success {
+            border-color: var(--success-color);
+        }
+
+        .result-box.error {
+            border-color: var(--error-color);
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .result-box.success .result-title {
+            color: var(--success-color);
+        }
+
+        .result-box.error .result-title {
+            color: var(--error-color);
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .preview-table th {
+            background: var(--bg-primary);
+            font-weight: 600;
+        }
+
+        .preview-table td {
+            background: var(--bg-secondary);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .tag.category {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .example {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 11px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📥 分类数据导入</h1>
+        <p class="subtitle">批量导入 AI 生成的分类标签到数据库</p>
+
+        <div class="input-group">
+            <div class="result-title">📤 待处理数据导出 (For Grok)</div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">获取尚未分类的推文链接，以便发送给 Grok 进行批量分析。
+            </p>
+            <div class="btn-row" style="margin-top:0">
+                <input type="number" id="limitInput" value="20" min="1" max="100"
+                    style="width:80px; padding:8px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-primary); color:var(--text-primary);">
+                <button id="fetchUnclassifiedBtn">🔍 获取待分类链接</button>
+            </div>
+            <textarea id="unclassifiedOutput" placeholder="点击上方按钮获取链接..."
+                style="min-height:100px; margin-top:12px; margin-bottom:12px;" readonly></textarea>
+            <div class="btn-row" style="margin-top:0">
+                <button id="copyLinksBtn" class="btn-secondary">📋 复制链接</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>粘贴 JSON 数据</label>
+            <textarea id="jsonInput" placeholder='粘贴 Grok 生成的 JSON 数组，格式如下：
+[
+  {
+    "post_id": "2010497572704501766",
+    "author": "dotey",
+    "hierarchical": {
+      "艺术与幻想": ["信息图/Infographic", "卡通/插图"]
+    },
+    "flat_tags": ["小红书风格", "infographic series"]
+  },
+  ...
+]'></textarea>
+
+            <div class="btn-row">
+                <button id="validateBtn">📋 验证格式</button>
+                <button id="importBtn" disabled>📥 导入数据库</button>
+                <button id="clearBtn" class="btn-secondary">清空</button>
+                <span id="status"></span>
+            </div>
+        </div>
+
+        <div id="previewBox" class="result-box">
+            <div class="result-title">📋 数据预览</div>
+            <div id="previewContent"></div>
+        </div>
+
+        <div id="resultBox" class="result-box">
+            <div class="result-title" id="resultTitle">结果</div>
+            <div id="resultContent"></div>
+        </div>
+
+        <div class="input-group">
+            <label>📝 示例数据格式</label>
+            <div class="example">[
+                {
+                "post_id": "2010497572704501766",
+                "author": "dotey",
+                "hierarchical": {
+                "艺术与幻想": ["信息图/Infographic", "卡通/插图"],
+                "产品与营销": ["小红书风格"]
+                },
+                "flat_tags": ["小红书风格", "infographic series", "AI prompt", "hand-drawn text"]
+                }
+                ]</div>
+        </div>
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById('jsonInput');
+        const validateBtn = document.getElementById('validateBtn');
+        const importBtn = document.getElementById('importBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const status = document.getElementById('status');
+        const previewBox = document.getElementById('previewBox');
+        const previewContent = document.getElementById('previewContent');
+        const resultBox = document.getElementById('resultBox');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultContent = document.getElementById('resultContent');
+
+        let parsedData = null;
+
+        // Find API base
+        let apiBase = window.location.origin;
+        if (window.location.protocol === 'file:') {
+            apiBase = 'http://localhost:5502';
+        }
+
+        validateBtn.addEventListener('click', () => {
+            const input = jsonInput.value.trim();
+            if (!input) {
+                showResult('error', '请先粘贴 JSON 数据');
+                return;
+            }
+
+            try {
+                parsedData = JSON.parse(input);
+
+                if (!Array.isArray(parsedData)) {
+                    throw new Error('数据必须是 JSON 数组');
+                }
+
+                if (parsedData.length === 0) {
+                    throw new Error('数组不能为空');
+                }
+
+                // Validate structure
+                const errors = [];
+                parsedData.forEach((item, i) => {
+                    if (!item.post_id) {
+                        errors.push(`第 ${i + 1} 项缺少 post_id`);
+                    }
+                    if (!item.hierarchical || typeof item.hierarchical !== 'object') {
+                        errors.push(`第 ${i + 1} 项的 hierarchical 格式不正确`);
+                    }
+                });
+
+                if (errors.length > 0) {
+                    throw new Error(errors.join('\n'));
+                }
+
+                // Calculate Stats
+                const totalItems = parsedData.length;
+                const totalTags = parsedData.reduce((acc, item) => acc + (item.flat_tags ? item.flat_tags.length : 0), 0);
+                const avgTags = totalItems > 0 ? (totalTags / totalItems).toFixed(1) : 0;
+
+                // Show preview
+                showPreview(parsedData);
+                importBtn.disabled = false;
+                status.innerHTML = `✓ 验证通过<br>
+                    <span style="color:#8b949e; font-size:12px">
+                    共 ${totalItems} 条记录 | 
+                    标签总数: <strong style="color:#a78bfa">${totalTags}</strong> | 
+                    平均: <strong style="color:#a78bfa">${avgTags}</strong> 个/条
+                    </span>`;
+                status.style.color = '#3fb950';
+
+            } catch (e) {
+                parsedData = null;
+                importBtn.disabled = true;
+                previewBox.classList.remove('show');
+                showResult('error', `格式错误: ${e.message}`);
+            }
+        });
+
+        importBtn.addEventListener('click', async () => {
+            if (!parsedData) {
+                showResult('error', '请先验证数据');
+                return;
+            }
+
+            importBtn.disabled = true;
+            status.textContent = '导入中...';
+
+            try {
+                const response = await fetch(`${apiBase}/api/import_classifications`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(parsedData)
+                });
+
+                const result = await response.json();
+
+                if (result.ok) {
+                    showResult('success', `成功导入 ${result.updated} 条记录`);
+                    status.textContent = '✓ 导入完成';
+                    status.style.color = '#3fb950';
+                } else {
+                    throw new Error(result.error || '导入失败');
+                }
+            } catch (e) {
+                showResult('error', `导入失败: ${e.message}`);
+                status.textContent = '';
+            } finally {
+                importBtn.disabled = false;
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            jsonInput.value = '';
+            parsedData = null;
+            importBtn.disabled = true;
+            previewBox.classList.remove('show');
+            resultBox.classList.remove('show');
+            status.textContent = '';
+        });
+
+        function showPreview(data) {
+            let html = `<table class="preview-table">
+                <tr>
+                    <th>Post ID</th>
+                    <th>Author</th>
+                    <th>分类 (hierarchical)</th>
+                    <th>标签 (flat_tags)</th>
+                </tr>`;
+
+            data.slice(0, 10).forEach(item => {
+                const categories = Object.entries(item.hierarchical || {}).map(([cat, subs]) =>
+                    `<span class="tag category">${cat}</span>` +
+                    (subs || []).map(s => `<span class="tag">${s}</span>`).join('')
+                ).join('');
+
+                const tags = (item.flat_tags || []).slice(0, 5).map(t =>
+                    `<span class="tag">${t}</span>`
+                ).join('');
+
+                html += `<tr>
+                    <td>${item.post_id}</td>
+                    <td>${item.author || '-'}</td>
+                    <td>${categories}</td>
+                    <td>${tags}${(item.flat_tags || []).length > 5 ? '...' : ''}</td>
+                </tr>`;
+            });
+
+            if (data.length > 10) {
+                html += `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary);">
+                    ... 还有 ${data.length - 10} 条记录
+                </td></tr>`;
+            }
+
+            html += '</table>';
+            previewContent.innerHTML = html;
+            previewBox.classList.add('show');
+        }
+
+        function showResult(type, message) {
+            resultBox.className = `result-box show ${type}`;
+            resultTitle.textContent = type === 'success' ? '✓ 成功' : '✗ 错误';
+            resultContent.textContent = message;
+        }
+
+        // Auto-validate on paste
+        jsonInput.addEventListener('paste', () => {
+            setTimeout(() => validateBtn.click(), 100);
+        });
+
+        // Export Logic
+        const limitInput = document.getElementById('limitInput');
+        const fetchUnclassifiedBtn = document.getElementById('fetchUnclassifiedBtn');
+        const unclassifiedOutput = document.getElementById('unclassifiedOutput');
+        const copyLinksBtn = document.getElementById('copyLinksBtn');
+
+        if (fetchUnclassifiedBtn) {
+            fetchUnclassifiedBtn.addEventListener('click', async () => {
+                const limit = limitInput.value;
+                fetchUnclassifiedBtn.disabled = true;
+                fetchUnclassifiedBtn.textContent = '获取中...';
+
+                try {
+                    const res = await fetch(`${apiBase}/api/unclassified_tweets?limit=${limit}`);
+                    const data = await res.json();
+
+                    if (data.links && data.links.length > 0) {
+                        unclassifiedOutput.value = data.links.join('\n');
+                        showResult('success', `成功获取 ${data.links.length} 条待分类链接`); // Using existing showResult helper
+                    } else {
+                        unclassifiedOutput.value = '';
+                        showResult('error', '未找到待分类数据');
+                    }
+                } catch (e) {
+                    showResult('error', `获取失败: ${e.message}`);
+                } finally {
+                    fetchUnclassifiedBtn.disabled = false;
+                    fetchUnclassifiedBtn.textContent = '🔍 获取待分类链接';
+                }
+            });
+
+            copyLinksBtn.addEventListener('click', () => {
+                if (!unclassifiedOutput.value) return;
+                navigator.clipboard.writeText(unclassifiedOutput.value);
+                const originalText = copyLinksBtn.textContent;
+                copyLinksBtn.textContent = '已复制!';
+                setTimeout(() => copyLinksBtn.textContent = originalText, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>

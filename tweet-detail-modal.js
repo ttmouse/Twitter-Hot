@@ -120,32 +120,13 @@ function openTweetDetail(data, url, index, cards) {
         const delta = e.deltaY;
         if (Math.abs(delta) < 10) return; // Ignore small movements
 
-        const direction = delta > 0 ? 1 : -1;
-
-        // Check if we are over a scrollable element (specifically the text body)
-        const scrollable = e.target.closest('.tweet-detail-body');
-
-        if (scrollable) {
-            // Check if scrollable
-            const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
-
-            if (isScrollable) {
-                // If scrolling down
-                if (direction > 0) {
-                    // Allow scroll if not at bottom (with small buffer)
-                    if (scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight - 1) {
-                        return; // Let default scroll happen
-                    }
-                }
-                // If scrolling up
-                else {
-                    // Allow scroll if not at top
-                    if (scrollable.scrollTop > 1) {
-                        return; // Let default scroll happen
-                    }
-                }
-            }
+        // USER REQUEST: Disable navigation when scrolling over the right text column
+        // This allows the user to scroll the text content freely usage without standard navigation kicking in
+        if (e.target.closest('.tweet-detail-right-col')) {
+            return;
         }
+
+        const direction = delta > 0 ? 1 : -1;
 
         // Navigate
         window.lastScrollTime = now;

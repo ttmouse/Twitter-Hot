@@ -1,0 +1,17 @@
+#!/usr/bin/expect -f
+
+source "deploy_secrets.exp"
+set timeout 60
+set host "38.55.192.139"
+set user "root"
+set password "Pf-^lM3Y=G"
+set cmd "docker cp /root/twitter-hot/neondb_backup_20260112_213330.json twitter-hot-backend-1:/app/ && docker cp /root/twitter-hot/fix_db_authors.py twitter-hot-backend-1:/app/ && docker exec twitter-hot-backend-1 python fix_db_authors.py"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

@@ -25,9 +25,9 @@
         })();
     </script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="stylesheet" href="styles.css?v=13">
-    <link rel="stylesheet" href="tweet-detail-modal.css?v=13">
-    <link rel="stylesheet" href="custom-tweet-card.css?v=13">
+    <link rel="stylesheet" href="styles.css?v=29">
+    <link rel="stylesheet" href="tweet-detail-modal.css?v=15">
+    <link rel="stylesheet" href="custom-tweet-card.css?v=14">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -123,6 +123,18 @@
         </div>
     </nav>
 
+    <!-- Left Sidebar (Taxonomy) -->
+    <aside class="sidebar-left">
+        <div class="sidebar-title">
+            Categories
+        </div>
+        <div class="category-list" id="categoryList">
+            <div style="text-align:center; padding:20px; color:var(--text-secondary);">
+                <!-- Categories will be populated here -->
+            </div>
+        </div>
+    </aside>
+
     <div class="container">
         <!-- Header - 已移除 -->
 
@@ -148,7 +160,21 @@
 
     </div>
 
+    <!-- Right Sidebar (Fixed) -->
+    <aside class="sidebar-right">
+        <div class="sidebar-title">
+            Top Authors
+        </div>
+        <div class="author-list" id="authorList">
+            <div style="text-align:center; padding:20px; color:var(--text-secondary);">
+                <div class="loading-spinner small" style="margin:0 auto 10px;"></div>
+                Loading stats...
+            </div>
+        </div>
+    </aside>
+
     <!-- Load libraries with multiple fallbacks and verification -->
+
     <script>
         (function () {
             let html2canvasLoaded = false;
@@ -280,7 +306,10 @@
             attemptToLoadLibraries();
         })();
     </script>
-    <script src="app-core.js?v=13"></script>
+    <!-- Modular JS Architecture -->
+    <script src="js/theme.js?v=1"></script>
+    <script src="js/api.js?v=1"></script>
+    <script src="app-core.js?v=36"></script>
     <script src="tweet-detail-modal.js?v=13"></script>
     <script src="custom-tweet-card.js?v=13"></script>
 

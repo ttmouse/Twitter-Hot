@@ -1,0 +1,7 @@
+#!/usr/bin/expect -f
+set timeout 20
+set password "Pf-^lM3Y=G"
+spawn ssh -o StrictHostKeyChecking=no root@38.55.192.139 "docker exec twitter-hot-backend-1 python3 -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:5500/api/unclassified_tweets?limit=1').read().decode())\""
+expect "password:"
+send "$password\r"
+expect eof

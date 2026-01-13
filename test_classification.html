@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>推文分类实验室</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --success: #238636;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            resize: vertical;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+        }
+
+        button {
+            background-color: var(--success);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .preview-img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #2a3038;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tweet-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-clamp: 2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tags-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tag.photography {
+            color: #f2cc60;
+            background: rgba(242, 204, 96, 0.15);
+            border-color: rgba(242, 204, 96, 0.3);
+        }
+
+        .tag.tech {
+            color: #58a6ff;
+        }
+
+        .tag.art {
+            color: #f778ba;
+            background: rgba(247, 120, 186, 0.15);
+            border-color: rgba(247, 120, 186, 0.3);
+        }
+
+        .rule-info {
+            font-size: 11px;
+            color: #6e7681;
+            margin-left: 8px;
+        }
+
+        .error {
+            color: #ff7b72;
+            font-size: 13px;
+        }
+
+        .loading {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Rule Explainer */
+        .rules-explainer {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🛠️ 推文分类实验室 (Tweet Lab)</h1>
+
+        <div class="input-group">
+            <textarea id="urlInput" placeholder="在此粘贴推文链接 (每行一个)...
+示例:
+https://x.com/username/status/123456
+https://x.com/photographer/status/987654"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <button id="analyzeBtn">运行分析</button>
+                <span id="status" style="font-size:13px; color:var(--text-secondary);"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Configuration Panel -->
+    <div class="input-group" id="aiConfigPanel">
+        <details>
+            <summary style="cursor:pointer; font-weight:600; margin-bottom:12px;">🤖 AI 识别配置 (可选)</summary>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+                <div>
+                    <label style="font-size:12px; color:var(--text-secondary);">API Endpoint</label>
+                    <input type="text" id="aiApiEndpoint" placeholder="https://api.z.ai/api/coding/paas/v4"
+                        style="width:100%; padding:8px; background:#0d1117; border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-secondary);">API Key</label>
+                    <input type="password" id="aiApiKey" placeholder="your-api-key-here"
+                        style="width:100%; padding:8px; background:#0d1117; border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-secondary);">模型</label>
+                    <select id="aiModel"
+                        style="width:100%; padding:8px; background:#0d1117; border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px;">
+                        <option value="glm-4.5-air">GLM-4.5-Air (131K, 推荐)</option>
+                        <option value="glm-4.5">GLM-4.5 (131K)</option>
+                        <option value="glm-4.6">GLM-4.6 (205K)</option>
+                        <option value="glm-4.7">GLM-4.7 (205K, 最新)</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;">
+                        <input type="checkbox" id="enableAiClassification">
+                        启用 AI 二次识别
+                    </label>
+                    <button id="saveAiConfigBtn"
+                        style="margin-left:auto; padding:6px 12px; font-size:12px;">保存配置</button>
+                </div>
+                <div id="aiConfigStatus" style="font-size:11px; color:var(--text-secondary);"></div>
+            </div>
+        </details>
+    </div>
+
+    <div id="resultsList" class="results"></div>
+    </div>
+
+    <script>
+        // ================= LOGIC =================
+
+        const urlInput = document.getElementById('urlInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultsList = document.getElementById('resultsList');
+        const statusSpan = document.getElementById('status');
+
+        // Find local API Base
+        let apiBase = window.location.origin;
+
+        // If protocol is file, use the default port (5502 as per user config change)
+        if (window.location.protocol === 'file:') {
+            apiBase = 'http://localhost:5502';
+        }
+        // Otherwise, use relative path (works for 5502, 5500, or any port correctly serving the backend)
+
+        console.log('Using API Base:', apiBase);
+
+        // ================= AI CONFIG: localStorage persistence =================
+        const AI_CONFIG_KEY = 'tweetlab_ai_config';
+
+        const aiApiEndpoint = document.getElementById('aiApiEndpoint');
+        const aiApiKey = document.getElementById('aiApiKey');
+        const aiModel = document.getElementById('aiModel');
+        const enableAiCheckbox = document.getElementById('enableAiClassification');
+        const saveAiConfigBtn = document.getElementById('saveAiConfigBtn');
+        const aiConfigStatus = document.getElementById('aiConfigStatus');
+
+        // Load saved config on page load
+        function loadAiConfig() {
+            try {
+                const saved = localStorage.getItem(AI_CONFIG_KEY);
+                if (saved) {
+                    const config = JSON.parse(saved);
+                    aiApiEndpoint.value = config.endpoint || '';
+                    aiApiKey.value = config.apiKey || '';
+                    aiModel.value = config.model || 'glm-4.5-air';
+                    enableAiCheckbox.checked = config.enabled || false;
+                    aiConfigStatus.textContent = '✓ 已加载保存的配置';
+                }
+            } catch (e) {
+                console.error('Failed to load AI config:', e);
+            }
+        }
+
+        // Save config to localStorage
+        function saveAiConfig() {
+            try {
+                const config = {
+                    endpoint: aiApiEndpoint.value,
+                    apiKey: aiApiKey.value,
+                    model: aiModel.value,
+                    enabled: enableAiCheckbox.checked
+                };
+                localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
+                aiConfigStatus.textContent = '✓ 配置已保存';
+                setTimeout(() => aiConfigStatus.textContent = '', 3000);
+            } catch (e) {
+                console.error('Failed to save AI config:', e);
+                aiConfigStatus.textContent = '❌ 保存失败';
+            }
+        }
+
+        saveAiConfigBtn.addEventListener('click', saveAiConfig);
+        loadAiConfig(); // Load on page init
+
+        // ================= URL INPUT: localStorage persistence =================
+        const URL_INPUT_KEY = 'tweetlab_url_input';
+
+        // Load saved URLs on page load
+        const savedUrls = localStorage.getItem(URL_INPUT_KEY);
+        if (savedUrls) {
+            urlInput.value = savedUrls;
+        }
+
+        // Auto-save URLs on change
+        urlInput.addEventListener('input', () => {
+            localStorage.setItem(URL_INPUT_KEY, urlInput.value);
+        });
+
+        analyzeBtn.addEventListener('click', async () => {
+            const text = urlInput.value.trim();
+            if (!text) return;
+
+            const urls = text.split('\n')
+                .map(l => l.trim())
+                .filter(l => l && (l.includes('x.com') || l.includes('twitter.com')));
+
+            resultsList.innerHTML = '';
+            analyzeBtn.disabled = true;
+            statusSpan.textContent = `正在处理 ${urls.length} 条推文...`;
+
+            for (const url of urls) {
+                await processTweet(url);
+            }
+
+            analyzeBtn.disabled = false;
+            statusSpan.textContent = '完成!';
+        });
+
+        async function processTweet(url) {
+            // UI Placeholder
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            card.innerHTML = `
+                <div class="loading">正在获取数据: ${url.slice(0, 40)}...</div>
+            `;
+            resultsList.appendChild(card);
+
+            try {
+                const tweetId = extractTweetId(url);
+                if (!tweetId) throw new Error("无效的链接 (未找到推文 ID)");
+
+                // Fetch Data
+                // Use absolute path to ensure it hits the server if we are on localhost
+                const fetchUrl = `${apiBase}/api/tweet_info?id=${tweetId}`;
+                console.log('Fetching:', fetchUrl);
+
+                const res = await fetch(fetchUrl);
+                if (!res.ok) {
+                    const errorText = await res.text().catch(() => '');
+                    throw new Error(`API 响应失败 (${res.status}): ${errorText.slice(0, 50) || '请确认后端服务已启动'}`);
+                }
+                const data = await res.json();
+
+                if (data.error) throw new Error(`API 错误: ${data.error}`);
+
+                // Store data on card for AI analysis
+                card._tweetData = data;
+
+                // Render Result (AI-only mode)
+                renderResult(card, url, data, null);
+
+            } catch (e) {
+                console.error(e);
+                card.innerHTML = `
+                    <div style="flex:1">
+                        <div class="error">❌ 错误: ${e.message}</div>
+                        <div style="font-size:11px; color:#6e7681; margin-top:4px;">
+                            请确认 <b>server.py</b> 正在运行。<br>
+                            如果仍有问题，请尝试直接在浏览器访问: <br>
+                            <a href="http://localhost:5502/test_classification.html" target="_blank" style="color:#58a6ff">http://localhost:5502/test_classification.html</a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function extractTweetId(url) {
+            const match = url.match(/status\/(\d+)/);
+            return match ? match[1] : null;
+        }
+
+        // AI Classification via GLM API
+        async function runAiClassification(text, endpoint, apiKey, model) {
+            // Ensure endpoint ends with /chat/completions (OpenAI-compatible format)
+            let fullEndpoint = endpoint.replace(/\/+$/, ''); // Remove trailing slashes
+            if (!fullEndpoint.endsWith('/chat/completions')) {
+                fullEndpoint += '/chat/completions';
+            }
+
+            const taxonomy = {
+                "人物肖像": ["名人/现实主义", "性感/时尚", "自定义角色", "个人品牌", "身份编辑", "工作室肖像"],
+                "艺术与幻想": ["动漫/Kawaii", "卡通/插图", "科幻/超现实", "Chibi风格", "信息图/Infographic", "抽象/实验"],
+                "产品与营销": ["产品摄影", "广告/海报", "包装设计", "时尚品牌", "奢华护肤", "食物广告", "成分可视化", "小红书风格"],
+                "可视化与分解": ["成分环绕", "成分悬浮", "浮动构图", "解剖/生物", "教育图表"],
+                "幽默与Meme": ["政治/讽刺", "混合/编辑", "搞笑场景"],
+                "自然与环境": ["季节/景观", "城市/氛围", "治愈/梦幻", "地图/3D视图"],
+                "视频与动态": ["文本到视频", "动画效果", "产品旋转"],
+                "其他/实验": ["伦理/争议", "工具比较"]
+            };
+
+            const systemPrompt = `你是AI生图提示词分类器。只返回JSON，不要有任何其他文字。
+
+根据推文内容，使用以下分类体系进行标注：
+
+【分类体系】
+${JSON.stringify(taxonomy, null, 2)}
+
+【输出要求】
+1. hierarchical：选择1-2个一级大类，每个大类下选择1-3个最相关的二级子类
+2. flat_tags：提取3-5个描述性关键词（风格、技术、氛围等）
+
+【输出格式】
+{
+  "hierarchical": {
+    "一级大类": ["二级子类1", "二级子类2"]
+  },
+  "flat_tags": ["关键词1", "关键词2", "关键词3"]
+}`;
+
+            const response = await fetch(fullEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: text || '(空内容)' }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`AI API ${response.status}: ${errText.slice(0, 50)}`);
+            }
+
+            const result = await response.json();
+            console.log('🤖 AI API 完整响应:', result);
+
+            // GLM models might return content in different fields
+            const message = result.choices?.[0]?.message || {};
+            let content = message.content || '';
+            const reasoning = message.reasoning_content || '';
+
+            console.log('🤖 content:', content);
+            console.log('🤖 reasoning_content:', reasoning);
+
+            // Use content if available, otherwise try to extract from reasoning
+            let textToAnalyze = content || reasoning;
+
+            // Try to extract JSON from the text - look for hierarchical or tags format
+            // Match JSON object containing either hierarchical or tags
+            const jsonMatch = textToAnalyze.match(/\{[\s\S]*?"(hierarchical|tags)"[\s\S]*?\}/);
+            if (jsonMatch) {
+                try {
+                    // Find the complete JSON object
+                    let jsonStr = jsonMatch[0];
+                    // Try to find a balanced JSON by counting braces
+                    let braceCount = 0;
+                    let startIdx = textToAnalyze.indexOf('{');
+                    for (let i = startIdx; i < textToAnalyze.length; i++) {
+                        if (textToAnalyze[i] === '{') braceCount++;
+                        if (textToAnalyze[i] === '}') braceCount--;
+                        if (braceCount === 0) {
+                            jsonStr = textToAnalyze.slice(startIdx, i + 1);
+                            break;
+                        }
+                    }
+
+                    const parsed = JSON.parse(jsonStr);
+                    console.log('🤖 提取到的JSON:', jsonStr);
+                    console.log('🤖 解析后的数据:', parsed);
+
+                    // Handle new hierarchical + flat_tags format
+                    const result = [];
+
+                    if (parsed.hierarchical) {
+                        // Extract hierarchical categories
+                        for (const [level1, level2List] of Object.entries(parsed.hierarchical)) {
+                            result.push({ label: `📂 ${level1}`, reason: '一级分类', type: 'ai-category' });
+                            if (Array.isArray(level2List)) {
+                                level2List.forEach(sub => {
+                                    result.push({ label: sub, reason: level1, type: 'ai-subcategory' });
+                                });
+                            }
+                        }
+                    }
+
+                    if (parsed.flat_tags && Array.isArray(parsed.flat_tags)) {
+                        parsed.flat_tags.forEach(tag => {
+                            result.push({ label: `🏷️ ${tag}`, reason: '描述标签', type: 'ai-tag' });
+                        });
+                    }
+
+                    // Fallback to old tags format
+                    if (parsed.tags && Array.isArray(parsed.tags)) {
+                        parsed.tags.forEach(tag => {
+                            result.push({ label: tag, reason: 'AI分析', type: 'ai' });
+                        });
+                    }
+
+                    if (result.length > 0) return result;
+                } catch (e) {
+                    console.log('🤖 JSON解析失败:', e);
+                }
+            }
+
+            // Fallback: extract categories from text directly
+            console.log('🤖 未找到JSON，尝试从文本提取标签');
+            const categories = ['人物肖像', '艺术与幻想', '产品与营销', '可视化与分解', '幽默与Meme', '自然与环境', '视频与动态', '其他/实验'];
+            const foundTags = categories.filter(tag => textToAnalyze.includes(tag));
+
+            if (foundTags.length > 0) {
+                console.log('🤖 从文本提取的标签:', foundTags);
+                return foundTags.map(tag => ({ label: tag, reason: '从分析提取', type: 'ai' }));
+            }
+
+            // Still nothing? Return a summary
+            return [{ label: '(AI未返回标签)', reason: '请检查控制台', type: 'ai' }];
+        }
+
+        function renderResult(card, url, data, aiTags) {
+            // Note: vxtwitter API returns 'mediaURLs' (camelCase)
+            // Only show first thumbnail for compact view
+            const firstImg = (data.mediaURLs || [])[0];
+            const mediaHtml = firstImg
+                ? `<img src="${firstImg}" class="preview-img" onclick="window.open('${firstImg}','_blank')" title="点击查看大图">`
+                : '';
+
+            const cleanText = data.text || '';
+
+            // AI section: always show button + result area
+            const aiTagsHtml = aiTags ? aiTags.map(tag => `
+                <span class="tag ai" style="background:rgba(139,92,246,0.15); color:#a78bfa; border-color:rgba(139,92,246,0.3);">
+                    ${tag.label}
+                </span>
+            `).join('') : '';
+
+            const aiSectionHtml = `
+                <span class="ai-result">${aiTagsHtml}</span>
+                <button class="ai-analyze-btn" style="padding:4px 10px; font-size:11px; background:#7c3aed; border-radius:4px; margin-left:8px;">
+                    🔄 AI分析
+                </button>
+                <span class="ai-loading" style="display:none; font-size:11px; color:#a78bfa; margin-left:8px;">分析中...</span>
+            `;
+
+            card.innerHTML = `
+                ${mediaHtml}
+                <div class="content">
+                    <div class="tweet-text">${cleanText}</div>
+                    <div class="ai-row">
+                        <span style="font-size:11px; color:#6e7681; margin-right:8px;">🤖 分类:</span>
+                        ${aiSectionHtml}
+                    </div>
+                </div>
+            `;
+
+            // Attach AI button handler
+            const aiBtn = card.querySelector('.ai-analyze-btn');
+            if (aiBtn) {
+                aiBtn.addEventListener('click', () => triggerAiClassification(card));
+            }
+        }
+
+        // AI Classification (triggered by button click)
+        async function triggerAiClassification(card) {
+            const btn = card.querySelector('.ai-analyze-btn');
+            const loading = card.querySelector('.ai-loading');
+            const resultSpan = card.querySelector('.ai-result');
+
+            if (!aiApiKey.value || !aiApiEndpoint.value) {
+                resultSpan.innerHTML = '<span style="color:#ff7b72; font-size:11px;">请先配置 API</span>';
+                return;
+            }
+
+            btn.style.display = 'none';
+            loading.style.display = 'inline';
+
+            try {
+                const text = card._tweetData?.text || '';
+                const aiTags = await runAiClassification(text, aiApiEndpoint.value, aiApiKey.value, aiModel.value);
+
+                loading.style.display = 'none';
+                btn.style.display = 'inline';
+                resultSpan.innerHTML = aiTags.map(tag => `
+                    <span class="tag ai" style="background:rgba(139,92,246,0.15); color:#a78bfa; border-color:rgba(139,92,246,0.3);">
+                        🤖 ${tag.label}
+                    </span>
+                `).join('');
+            } catch (err) {
+                loading.style.display = 'none';
+                btn.style.display = 'inline';
+                resultSpan.innerHTML = `<span style="color:#ff7b72; font-size:11px;">错误: ${err.message.slice(0, 30)}</span>`;
+            }
+        }
+    </script>
+</body>
+
+</html>
