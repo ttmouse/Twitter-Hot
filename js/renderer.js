@@ -452,52 +452,79 @@ class TweetRenderer {
         try {
             const res = await window.apiFetch('/api/categories');
             if (!res.ok) throw new Error('Failed to fetch categories');
-            const categoryStats = await res.json();
+            const rawData = await res.json();
+
+            // Backward compatibility: Detect API format
+            // Old format: { "category": count }
+            // New format: { "category": { count, children: { "child": count } } }
+            const firstValue = Object.values(rawData)[0];
+            const isNestedFormat = firstValue && typeof firstValue === 'object' && 'count' in firstValue;
 
             let totalCount = 0;
-            // categoryStats is { parent: { count, children: { child: count } } }
-            const parents = Object.keys(categoryStats).sort((a, b) => categoryStats[b].count - categoryStats[a].count);
-
-            // For total display count, summing parent counts is often enough, 
-            // though it might double count if a tweet has multiple categories.
-            Object.values(categoryStats).forEach(p => totalCount += p.count);
-
+            let html = '';
             const activeCat = window.tweetLoader ? window.tweetLoader.activeGlobalCategory : null;
 
-            let html = `
-                <div class="category-item ${!activeCat ? 'active' : ''}" onclick="window.selectCategory(null)" id="cat-item-all">
-                    <span>All</span>
-                    <span class="category-count">${totalCount}</span>
-                </div>
-            `;
+            if (isNestedFormat) {
+                // New nested format
+                const parents = Object.keys(rawData).sort((a, b) => rawData[b].count - rawData[a].count);
+                Object.values(rawData).forEach(p => totalCount += p.count);
 
-            parents.forEach(parent => {
-                const parentData = categoryStats[parent];
-                const safeParent = parent.replace(/'/g, "\\'");
-                html += `
-                    <div class="category-item parent ${activeCat === parent ? 'active' : ''}" onclick="window.selectCategory('${safeParent}')" id="cat-item-${parent.replace(/\s+/g, '-')}">
-                        <span>${parent}</span>
-                        <span class="category-count">${parentData.count}</span>
+                html = `
+                    <div class="category-item ${!activeCat ? 'active' : ''}" onclick="window.selectCategory(null)" id="cat-item-all">
+                        <span>All</span>
+                        <span class="category-count">${totalCount}</span>
                     </div>
                 `;
 
-                // Render subcategories if they exist
-                if (parentData.children && Object.keys(parentData.children).length > 0) {
-                    const children = Object.keys(parentData.children).sort((a, b) => parentData.children[b] - parentData.children[a]);
-                    children.forEach(child => {
-                        const childCount = parentData.children[child];
-                        const safeChild = child.replace(/'/g, "\\'");
-                        // IDs for subcategories use parent prefix to avoid collisions
-                        const childId = `cat-item-${parent.replace(/\s+/g, '-')}-${child.replace(/\s+/g, '-')}`;
-                        html += `
-                            <div class="category-item child ${activeCat === child ? 'active' : ''}" onclick="window.selectCategory('${safeChild}')" id="${childId}">
-                                <span>${child}</span>
-                                <span class="category-count">${childCount}</span>
-                            </div>
-                        `;
-                    });
-                }
-            });
+                parents.forEach(parent => {
+                    const parentData = rawData[parent];
+                    const safeParent = parent.replace(/'/g, "\\'");
+                    html += `
+                        <div class="category-item parent ${activeCat === parent ? 'active' : ''}" onclick="window.selectCategory('${safeParent}')" id="cat-item-${parent.replace(/\s+/g, '-')}">
+                            <span>${parent}</span>
+                            <span class="category-count">${parentData.count}</span>
+                        </div>
+                    `;
+
+                    // Render subcategories if they exist
+                    if (parentData.children && Object.keys(parentData.children).length > 0) {
+                        const children = Object.keys(parentData.children).sort((a, b) => parentData.children[b] - parentData.children[a]);
+                        children.forEach(child => {
+                            const childCount = parentData.children[child];
+                            const safeChild = child.replace(/'/g, "\\'");
+                            const childId = `cat-item-${parent.replace(/\s+/g, '-')}-${child.replace(/\s+/g, '-')}`;
+                            html += `
+                                <div class="category-item child ${activeCat === child ? 'active' : ''}" onclick="window.selectCategory('${safeChild}')" id="${childId}">
+                                    <span>${child}</span>
+                                    <span class="category-count">${childCount}</span>
+                                </div>
+                            `;
+                        });
+                    }
+                });
+            } else {
+                // Old flat format: { "category": count }
+                const categories = Object.keys(rawData).sort((a, b) => rawData[b] - rawData[a]);
+                Object.values(rawData).forEach(c => totalCount += c);
+
+                html = `
+                    <div class="category-item ${!activeCat ? 'active' : ''}" onclick="window.selectCategory(null)" id="cat-item-all">
+                        <span>All</span>
+                        <span class="category-count">${totalCount}</span>
+                    </div>
+                `;
+
+                categories.forEach(cat => {
+                    const count = rawData[cat];
+                    const safeCat = cat.replace(/'/g, "\\'");
+                    html += `
+                        <div class="category-item ${activeCat === cat ? 'active' : ''}" onclick="window.selectCategory('${safeCat}')" id="cat-item-${cat.replace(/\s+/g, '-')}">
+                            <span>${cat}</span>
+                            <span class="category-count">${count}</span>
+                        </div>
+                    `;
+                });
+            }
 
             listContainer.innerHTML = html;
         } catch (e) {
