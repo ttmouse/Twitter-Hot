@@ -398,6 +398,10 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     } else {
         // Append to existing grid
         columns = Array.from(galleryContainer.querySelectorAll('.image-gallery-column'));
+        // Safety: if no columns found, create them
+        if (columns.length === 0) {
+            columns = createColumns(galleryContainer);
+        }
     }
 
     galleryObserverInstance = new IntersectionObserver((entries) => {
