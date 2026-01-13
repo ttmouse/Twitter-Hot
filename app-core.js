@@ -1,206 +1,19 @@
-// Extract tweet ID from URL
+// Extract tweet ID from URL or Object
 function extractTweetId(url) {
-    const match = url.match(/status\/(\d+)/);
+    if (!url) return null;
+    if (typeof url === 'object' && url.id) return url.id;
+    const urlStr = typeof url === 'string' ? url : (url.url || '');
+    const match = urlStr.match(/status\/(\d+)/);
     return match ? match[1] : null;
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+// Note: Theme module (js/theme.js) provides:
+// - getCurrentTheme, setThemePreference, syncBodyThemeClass, setupThemeToggle, updateThemeToggleIcon
 
-const SITE_THEME_STORAGE_KEY = 'site-theme';
-const SUN_ICON = `
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-`;
-const MOON_ICON = `
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-`;
+// Note: API module (js/api.js) provides:
+// - getApiBaseUrl, setApiBaseUrl, apiFetch, buildApiUrl
 
-(function ensureStoredThemeApplied() {
-    try {
-        const savedTheme = localStorage.getItem(SITE_THEME_STORAGE_KEY);
-        if (savedTheme === 'light') {
-            document.documentElement.classList.add('light-mode');
-        } else if (savedTheme === 'dark') {
-            document.documentElement.classList.remove('light-mode');
-        }
-    } catch (error) {
-        // Storage access failed, keep default theme.
-    }
-})();
-
-function isLightThemeActive() {
-    return document.documentElement.classList.contains('light-mode');
-}
-
-function syncBodyThemeClass() {
-    if (!document.body) return;
-    document.body.classList.toggle('light-mode', isLightThemeActive());
-}
-
-function getCurrentTheme() {
-    return isLightThemeActive() ? 'light' : 'dark';
-}
-
-function setThemePreference(theme, options = {}) {
-    const { persist = true, reloadTweets = false } = options;
-    const isLight = theme === 'light';
-
-    document.documentElement.classList.toggle('light-mode', isLight);
-
-    if (persist) {
-        try {
-            localStorage.setItem(SITE_THEME_STORAGE_KEY, theme);
-        } catch (error) {
-            console.warn('Unable to persist theme preference:', error);
-        }
-    }
-
-    syncBodyThemeClass();
-    updateThemeToggleIcon();
-
-    if (reloadTweets) {
-        reloadAllTweetEmbeds();
-    }
-}
-
-function updateThemeToggleIcon() {
-    const icon = document.getElementById('themeToggleIcon');
-    if (!icon) return;
-    icon.innerHTML = isLightThemeActive() ? MOON_ICON : SUN_ICON;
-}
-
-function setupThemeToggle() {
-    const toggle = document.getElementById('themeToggle');
-    if (!toggle) return;
-
-    toggle.addEventListener('click', () => {
-        const nextTheme = isLightThemeActive() ? 'dark' : 'light';
-        setThemePreference(nextTheme, { reloadTweets: true });
-    });
-
-    updateThemeToggleIcon();
-    syncBodyThemeClass();
-}
-
-let apiBaseUrl = '';
-
-function normalizeApiBase(value) {
-    const trimmed = (value || '').trim();
-    if (!trimmed) return '';
-    try {
-        const parsed = new URL(trimmed);
-        return parsed.origin;
-    } catch (e) {
-        console.warn('Invalid API base provided, falling back to same origin.');
-        return '';
-    }
-}
-
-(function initializeApiBase() {
-    const queryValue = urlParams.get('apiBase');
-    if (queryValue !== null) {
-        const normalized = normalizeApiBase(queryValue);
-        if (normalized) {
-            localStorage.setItem('apiBaseUrl', normalized);
-            apiBaseUrl = normalized;
-        } else {
-            localStorage.removeItem('apiBaseUrl');
-            apiBaseUrl = '';
-        }
-    } else {
-        apiBaseUrl = localStorage.getItem('apiBaseUrl') || '';
-    }
-})();
-
-function setApiBaseUrl(value) {
-    const normalized = normalizeApiBase(value);
-    if (normalized) {
-        localStorage.setItem('apiBaseUrl', normalized);
-        apiBaseUrl = normalized;
-    } else {
-        localStorage.removeItem('apiBaseUrl');
-        apiBaseUrl = '';
-    }
-    return apiBaseUrl;
-}
-
-function getApiBaseUrl() {
-    return apiBaseUrl;
-}
-
-function buildApiUrl(path) {
-    if (!apiBaseUrl) {
-        // Hybrid Mode: If we are on Vercel (or any non-local, non-VPS domain), default to VPS API
-        const host = window.location.hostname;
-        if (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('ttmouse.com')) {
-            // EXCEPTION: Keep tweet_info on Vercel to use distributed Serverless IPs (avoid 429)
-            if (path.includes('tweet_info')) {
-                return path;
-            }
-            console.log('Hybrid Mode detected: Defaulting API to https://ttmouse.com');
-            return `https://ttmouse.com/${path.replace(/^\/+/, '')}`;
-        }
-        return path;
-    }
-
-    // CRITICAL FIX: Force relative paths (HTTPS) for production domain
-    if (window.location.hostname === 'ttmouse.com' || window.location.hostname.endsWith('.ttmouse.com')) {
-        apiBaseUrl = '';
-        try { localStorage.removeItem('apiBaseUrl'); } catch (e) { }
-        return path;
-    }
-
-    // Auto-upgrade insecure API base if we are on HTTPS
-    if (window.location.protocol === 'https:') {
-        // Fix 1: If we are valid domain, DO NOT use IP address for API
-        if (window.location.hostname.includes('ttmouse.com')) {
-            if (apiBaseUrl && (apiBaseUrl.includes('38.55.192.139') || apiBaseUrl.includes('localhost'))) {
-                console.log('Correcting API Base URL to domain...');
-                apiBaseUrl = ''; // Use relative paths
-                localStorage.removeItem('apiBaseUrl');
-            }
-        }
-
-        // Fix 2: Upgrade HTTP to HTTPS
-        if (apiBaseUrl && apiBaseUrl.startsWith('http:')) {
-            apiBaseUrl = apiBaseUrl.replace('http:', 'https:');
-            localStorage.setItem('apiBaseUrl', apiBaseUrl);
-        }
-    }
-
-    if (path.startsWith('http')) {
-        // Fix mixed content for absolute paths in arguments
-        if (window.location.protocol === 'https:' && path.startsWith('http:')) {
-            // If absolute path is IP based, swap to domain to avoid SSL error
-            if (path.includes('38.55.192.139')) {
-                return path.replace('http:', 'https:').replace('38.55.192.139', 'ttmouse.com');
-            }
-            return path.replace('http:', 'https:');
-        }
-        return path;
-    }
-
-    const base = apiBaseUrl.replace(/\/+$/, '');
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${base}${cleanPath}`;
-}
-
-function apiFetch(path, options) {
-    return fetch(buildApiUrl(path), options);
-}
-
-window.getApiBaseUrl = getApiBaseUrl;
-window.setApiBaseUrl = setApiBaseUrl;
-window.apiFetch = apiFetch;
-window.buildApiUrl = buildApiUrl;
-window.getCurrentTheme = getCurrentTheme;
+// Legacy global exports (modules already expose these)
 window.fetchTweetMedia = fetchTweetMedia; // Expose for modal deduplication
 window.formatDate = formatDate;
 
@@ -340,7 +153,7 @@ function renderContent(append = false, dateLabel = null) {
 }
 
 // Render Standard Tweet List (Masonry) - Optimized for fast rendering
-function renderTweetList(container, append = false, startIndex = 0, dateLabel = null) {
+function renderTweetList(container, append = false, startIndex = 0, dateLabel = null, explicitItems = null) {
     // Helper function to get column count based on screen width
     const getColumnCount = () => {
         const width = window.innerWidth;
@@ -367,36 +180,15 @@ function renderTweetList(container, append = false, startIndex = 0, dateLabel = 
     let masonryContainer;
     let columns = [];
 
-    if (append && dateLabel) {
-        // Create wrapper for the day section
-        const daySection = document.createElement('div');
-        daySection.className = 'day-section';
-        container.appendChild(daySection);
-
-        // Add date separator to wrapper
-        const separator = createDateSeparator(dateLabel);
-        daySection.appendChild(separator);
-
-        // Create new masonry grid for this day
-        masonryContainer = document.createElement('div');
-        masonryContainer.className = 'masonry-grid';
-        daySection.appendChild(masonryContainer);
-
-        // Create columns
-        columns = createColumns(masonryContainer);
-    } else if (append) {
+    if (append) {
         // Continue with existing masonry grid
         masonryContainer = container.querySelector('.masonry-grid:last-child');
 
         // Fallback if no grid exists
         if (!masonryContainer) {
-            const daySection = document.createElement('div');
-            daySection.className = 'day-section';
-            container.appendChild(daySection);
-
             masonryContainer = document.createElement('div');
             masonryContainer.className = 'masonry-grid';
-            daySection.appendChild(masonryContainer);
+            container.appendChild(masonryContainer);
 
             columns = createColumns(masonryContainer);
         } else {
@@ -407,29 +199,17 @@ function renderTweetList(container, append = false, startIndex = 0, dateLabel = 
         // Initial load: clear and create first grid
         container.innerHTML = '';
 
-        // Use the provided dateLabel, or fall back to current date
-        const dateStr = dateLabel || ((typeof currentDate !== 'undefined' && currentDate) ? currentDate : null);
-
-        const daySection = document.createElement('div');
-        daySection.className = 'day-section';
-        container.appendChild(daySection);
-
-        // Only add separator if we have a date
-        if (dateStr) {
-            const separator = createDateSeparator(dateStr);
-            daySection.appendChild(separator);
-        }
-
         masonryContainer = document.createElement('div');
         masonryContainer.className = 'masonry-grid';
-        daySection.appendChild(masonryContainer);
+        container.appendChild(masonryContainer);
 
         // Create columns
         columns = createColumns(masonryContainer);
     }
 
     // Calculate the starting tweet index for this render
-    const tweetsToRender = tweetUrls.slice(startIndex);
+    // Use explicit items if provided (for filtering), otherwise slice from global
+    const tweetsToRender = explicitItems || tweetUrls.slice(startIndex);
 
     // Initialize virtual column heights
     // If appending, start with current DOM heights. If new, start with 0.
@@ -488,7 +268,8 @@ function renderTweetList(container, append = false, startIndex = 0, dateLabel = 
 }
 
 // 提取渲染单个tweet卡片的逻辑
-function renderTweetCard(url, actualIndex, targetColumn) {
+function renderTweetCard(item, actualIndex, targetColumn) {
+    const url = typeof item === 'string' ? item : (item.url || `https://x.com/i/status/${item.id}`);
     const contentItem = document.createElement('div');
     contentItem.className = 'masonry-item';
     contentItem.style.opacity = '0';
@@ -560,7 +341,7 @@ function createDateSeparator(dateStr) {
 }
 
 // Render Image Gallery - Optimized for fast rendering
-function renderImageGallery(container, append = false, startIndex = 0, dateLabel = null) {
+function renderImageGallery(container, append = false, startIndex = 0, dateLabel = null, explicitItems = null) {
     // Cleanup old gallery observer if not appending
     if (!append && galleryObserverInstance) {
         galleryObserverInstance.disconnect();
@@ -601,65 +382,22 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
         }, cols[0]);
     };
 
-    if (append && dateLabel) {
-        // Create wrapper for the day section
-        const daySection = document.createElement('div');
-        daySection.className = 'day-section';
-        container.appendChild(daySection);
+    // Unified Grid Logic (Waterfall) - Single continuous grid
+    galleryContainer = container.querySelector('.image-gallery-grid');
 
-        // Add date separator
-        const separator = createDateSeparator(dateLabel);
-        daySection.appendChild(separator);
-
-        // Create new gallery grid for this day
+    if (!galleryContainer) {
+        // Create new grid
         galleryContainer = document.createElement('div');
         galleryContainer.className = 'image-gallery-grid';
-        daySection.appendChild(galleryContainer);
-
-        // Create columns
+        container.appendChild(galleryContainer);
         columns = createColumns(galleryContainer);
-    } else if (append) {
-        // Continue with existing gallery grid
-        galleryContainer = container.querySelector('.image-gallery-grid:last-child');
-
-        // Fallback if no grid exists
-        if (!galleryContainer) {
-            const daySection = document.createElement('div');
-            daySection.className = 'day-section';
-            container.appendChild(daySection);
-
-            galleryContainer = document.createElement('div');
-            galleryContainer.className = 'image-gallery-grid';
-            daySection.appendChild(galleryContainer);
-
-            columns = createColumns(galleryContainer);
-        } else {
-            // Get existing columns
-            columns = Array.from(galleryContainer.querySelectorAll('.image-gallery-column'));
-        }
+    } else if (!append) {
+        // Reset existing grid (Preserve other elements like Separator)
+        galleryContainer.innerHTML = '';
+        columns = createColumns(galleryContainer);
     } else {
-        // Initial load: clear and create first grid
-        container.innerHTML = '';
-
-        // Use the provided dateLabel, or fall back to current date
-        const dateStr = dateLabel || ((typeof currentDate !== 'undefined' && currentDate) ? currentDate : null);
-
-        const daySection = document.createElement('div');
-        daySection.className = 'day-section';
-        container.appendChild(daySection);
-
-        // Only add separator if we have a date
-        if (dateStr) {
-            const separator = createDateSeparator(dateStr);
-            daySection.appendChild(separator);
-        }
-
-        galleryContainer = document.createElement('div');
-        galleryContainer.className = 'image-gallery-grid';
-        daySection.appendChild(galleryContainer);
-
-        // Create columns
-        columns = createColumns(galleryContainer);
+        // Append to existing grid
+        columns = Array.from(galleryContainer.querySelectorAll('.image-gallery-column'));
     }
 
     galleryObserverInstance = new IntersectionObserver((entries) => {
@@ -769,7 +507,8 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     }, { rootMargin: '200px' });
 
     // 首屏优先策略：立即渲染前12个
-    const tweetsToRender = tweetUrls.slice(startIndex);
+    // Use explicit items if provided (for filtering), otherwise slice from global
+    const tweetsToRender = explicitItems || tweetUrls.slice(startIndex);
     const visibleCount = 12;
     const visibleItems = tweetsToRender.slice(0, visibleCount);
     const remainingItems = tweetsToRender.slice(visibleCount);
@@ -796,7 +535,8 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
     };
 
     // 渲染单个gallery item的函数
-    const renderGalleryItem = (url, tweetIndex, targetColumn, delay = 0) => {
+    const renderGalleryItem = (item, tweetIndex, targetColumn, delay = 0) => {
+        const url = typeof item === 'string' ? item : (item.url || `https://x.com/i/status/${item.id}`);
         setTimeout(() => {
             const wrapper = document.createElement('div');
             wrapper.className = 'gallery-item';
@@ -808,6 +548,19 @@ function renderImageGallery(container, append = false, startIndex = 0, dateLabel
                 wrapper.dataset.tweetIndex = tweetIndex;
                 wrapper.dataset.tweetUrl = url; // Store URL for modal navigation
                 wrapper.dataset.loading = 'true'; // Mark for modal loading logic
+
+                // Add date for anchor navigation
+                // Add date for anchor navigation
+                let targetDate = dateLabel || ((typeof currentDate !== 'undefined' && currentDate) ? currentDate : '');
+
+                // Stream Mode: Use item's own date if available
+                if (typeof item === 'object') {
+                    if (item.publish_date) targetDate = item.publish_date;
+                    if (item._anchorId) wrapper.id = item._anchorId;
+                }
+
+                if (targetDate) wrapper.dataset.date = targetDate;
+
 
                 // Check for cached media to speed up modal thumbnails
                 const cached = tweetMediaCache.get(tweetId);
@@ -1844,6 +1597,20 @@ setTimeout(() => {
 const paramDate = urlParams.get('date');
 let currentDate = (paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) ? paramDate : null; // Will be set to latest date if null
 const tweetUrls = [];
+// Category Filter State
+let activeCategory = null;
+
+function getFilteredTweets() {
+    if (!activeCategory) return tweetUrls;
+    return tweetUrls.filter(t => {
+        if (!t.hierarchical) return false;
+        // Check if any top-level key matches activeCategory
+        // hierarchical structure: { "Category": ["Subcat"], "Tag": [] }
+        // We match keys.
+        return Object.keys(t.hierarchical).includes(activeCategory);
+    });
+}
+
 let availableDates = [];
 
 // LRU Cache implementation for tweet media
@@ -1958,13 +1725,22 @@ async function getFromDB(id) {
 }
 window.extractImageUrlsFromTweetInfo = extractImageUrlsFromTweetInfo;
 
-// Infinite scroll state
-let currentDateIndex = 0; // Index in availableDates array
-let isLoadingMore = false;
-let hasMoreDates = true;
-let loadedDates = new Set(); // Track loaded dates to avoid duplicates
-window.preloadSessionId = 0; // Control background loading chain
-window.currentPreloadController = null; // Controller to abort previous background requests
+// Global Stream State
+let streamOffset = 0;
+let streamStartDate = null; // Filter start date
+let lastRenderedDateStr = null; // For anchor insertion
+let isStreamLoading = false;
+let hasMoreStream = true;
+
+// Shared State
+let currentMode = 'stream'; // Unified mode
+let activeGlobalCategory = null;
+
+// Legacy vars preserved to prevent crashes if referenced, but unused
+let currentDateIndex = 0;
+let loadedDates = new Set();
+window.preloadSessionId = 0;
+window.currentPreloadController = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -1987,6 +1763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadAvailableDates();
         setupMobileStickyNav();
         setupInfiniteScroll();
+        renderCategories();
     }
 
     // Check if we are on the admin page (admin.html)
@@ -2035,9 +1812,9 @@ function setupInfiniteScroll() {
             const clientHeight = document.documentElement.clientHeight;
 
             // Load more when within 2500px of bottom (提前预加载，避免用户等待)
+            // Load more when within 2500px energy
             if (scrollHeight - (scrollTop + clientHeight) < 2500) {
-                // Preload up to 3 days ahead to satisfy user expectation of smooth browsing
-                loadNextDate(3);
+                loadStreamBatch();
             }
         }, 150); // 减少debounce时间，更快响应
     });
@@ -2048,65 +1825,9 @@ function setupInfiniteScroll() {
  * @param {number} lookaheadCount - How many additional days to load sequentially (default 1)
  * @param {number} sessionId - Current background load session ID
  */
-function loadNextDate(lookaheadCount = 1, sessionId = null) {
-    // If sessionId is provided, it must match current global ID
-    if (sessionId !== null && sessionId !== window.preloadSessionId) {
-        return;
-    }
-
-    // If this is a new session start, or if we want to be safe, cancel previous requests
-    if (sessionId !== null && (window.currentPreloadController === null || sessionId > 0)) {
-        // We only reset controller if we are starting a sequence
-        if (lookaheadCount > 10) { // arbitrary number to detect "full sequence" vs "scroll trigger"
-            if (window.currentPreloadController) window.currentPreloadController.abort();
-            window.currentPreloadController = new AbortController();
-        }
-    }
-
-    // Check if already loading or no more dates
-    if (isLoadingMore || !hasMoreDates) {
-        return;
-    }
-
-    // Find next date that hasn't been loaded
-    currentDateIndex++;
-
-    if (currentDateIndex >= availableDates.length) {
-        hasMoreDates = false;
-        console.log('[Infinite Scroll] No more dates available');
-        showEndOfContentMessage();
-        return;
-    }
-
-    const nextDate = availableDates[currentDateIndex].date;
-    console.log('[Infinite Scroll] Loading next date:', nextDate, 'index:', currentDateIndex, '/', availableDates.length, 'Lookahead remaining:', lookaheadCount - 1);
-
-    // Check if already loaded
-    if (loadedDates.has(nextDate)) {
-        console.log('[Infinite Scroll] Date already loaded, trying next...');
-        // Try next date, preserving lookahead count
-        loadNextDate(lookaheadCount);
-        return;
-    }
-
-    isLoadingMore = true;
-    loadedDates.add(nextDate);
-
-    // Show loading indicator
-    showLoadingIndicator();
-
-    // Load content for next date
-    const signal = window.currentPreloadController ? window.currentPreloadController.signal : null;
-
-    loadContentForDate(nextDate, true, () => {
-        // Callback after date content is loaded and elements are created
-        if (lookaheadCount > 1 && hasMoreDates) {
-            // Sequential preload: delay slightly to avoid UI stutter
-            setTimeout(() => {
-                loadNextDate(lookaheadCount - 1, sessionId);
-            }, 500);
-        }
-    }, signal);
+// Deprecated loadNextDate logic removed for Stream Mode
+function loadNextDate() {
+    console.warn('loadNextDate is deprecated. Use loadStreamBatch.');
 }
 
 /**
@@ -2423,141 +2144,33 @@ function loadAvailableDates() {
 
     dateTabsContainer.innerHTML = '<div class="loading-dates">Loading dates...</div>';
 
-    // Add retry mechanism
+    // Simplified Date Loading
     const fetchDates = (retryCount = 0) => {
         apiFetch('/api/dates')
-            .then(r => {
-                if (!r.ok) {
-                    throw new Error(`HTTP error! status: ${r.status}`);
-                }
-                // Check if response is JSON
-                const contentType = r.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    return r.json();
-                } else {
-                    throw new Error('Response is not JSON');
-                }
-            })
+            .then(r => r.ok ? r.json() : Promise.reject('API Error'))
             .then(data => {
                 availableDates = data.dates || [];
 
-                // Initialize infinite scroll state
+                // Initialize infinite scroll vars
                 currentDateIndex = 0;
-                loadedDates.clear();
-                hasMoreDates = availableDates.length > 1;
-
-                // If no date is set (no URL parameter), default to the latest available date
-                if (!currentDate && availableDates.length > 0) {
-                    currentDate = availableDates[0].date; // Dates are sorted newest first
-
-                    // Update URL parameter to reflect the selected date
-                    const url = new URL(window.location);
-                    url.searchParams.set('date', currentDate);
-                    window.history.replaceState({}, '', url);
-                }
-
-                // Mark initial date as loaded
-                if (currentDate) {
-                    loadedDates.add(currentDate);
-                }
+                hasMoreStream = true;
 
                 renderDateTabs();
-                selectDateTab(currentDate);
 
-                // Find correctly current index in available dates
-                if (currentDate) {
-                    const idx = availableDates.findIndex(d => d.date === currentDate);
-                    if (idx !== -1) {
-                        currentDateIndex = idx;
-                        console.log('[Init] Current date index set to:', currentDateIndex);
-                    }
-                }
-
-                // Load content for the current date with fallback to previous dates
-                if (currentDate) {
-                    window.preloadSessionId = Date.now();
-
-                    // SSOT: Manage AbortController for preloading
-                    if (window.currentPreloadController) window.currentPreloadController.abort();
-                    window.currentPreloadController = new AbortController();
-
-                    const currentSession = window.preloadSessionId;
-                    const signal = window.currentPreloadController.signal;
-
-                    // Helper function to try loading dates until we find one with data
-                    const loadFirstAvailableDate = (dateIndex = currentDateIndex) => {
-                        if (dateIndex >= availableDates.length) {
-                            // No more dates to try
-                            console.log('[Init] No dates with data found');
-                            const contentList = document.getElementById('contentList');
-                            if (contentList) {
-                                contentList.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No content available</div>';
-                            }
-                            return;
-                        }
-
-                        const dateToTry = availableDates[dateIndex].date;
-                        console.log('[Init] Trying to load date:', dateToTry, 'index:', dateIndex);
-
-                        loadContentForDate(dateToTry, false, null, signal)
-                            .then(count => {
-                                if (count > 0) {
-                                    // Found data! Update current date and index
-                                    currentDate = dateToTry;
-                                    currentDateIndex = dateIndex;
-                                    loadedDates.add(currentDate);
-
-                                    // Update URL parameter to reflect the actual loaded date
-                                    const url = new URL(window.location);
-                                    url.searchParams.set('date', currentDate);
-                                    window.history.replaceState({}, '', url);
-
-                                    // Update UI to reflect the loaded date
-                                    selectDateTab(currentDate);
-                                    syncMobileNavSelection(currentDate);
-
-                                    console.log('[Init] Successfully loaded date:', currentDate, 'with', count, 'tweets');
-
-                                    // After initial date is loaded, start loading remaining dates sequentially
-                                    if (hasMoreDates && window.preloadSessionId === currentSession) {
-                                        // Initial content loaded, preload next day (reduced from 3 to 1 to avoid 429)
-                                        console.log('[Init] Initial content loaded, preloading next day...');
-                                        // Add slight delay to let initial requests clear
-                                        setTimeout(() => {
-                                            preloadNextDates(currentDateIndex, 1);
-                                        }, 2000);
-                                    }
-                                } else {
-                                    // No data for this date, try the next one (previous day)
-                                    console.log('[Init] No data for date:', dateToTry, 'trying next date...');
-                                    loadFirstAvailableDate(dateIndex + 1);
-                                }
-                            })
-                            .catch(error => {
-                                if (error.name !== 'AbortError') {
-                                    console.error('[Init] Error loading date:', dateToTry, error);
-                                    // Try next date on error
-                                    loadFirstAvailableDate(dateIndex + 1);
-                                }
-                            });
-                    };
-
-                    loadFirstAvailableDate();
-                }
+                // Always start from latest - Stream Mode
+                if (availableDates.length > 0) currentDate = availableDates[0].date;
+                resetStream();
             })
             .catch(error => {
                 console.error('Error loading dates:', error);
-                if (retryCount < 2) {
-                    // Retry after 1 second
-                    setTimeout(() => fetchDates(retryCount + 1), 1000);
-                } else {
-                    dateTabsContainer.innerHTML = '<div class="no-dates">Failed to load dates. Please refresh.</div>';
-                }
+                if (retryCount < 2) setTimeout(() => fetchDates(retryCount + 1), 1000);
+                else dateTabsContainer.innerHTML = '<div class="no-dates">Failed to load dates.</div>';
             });
     };
 
     fetchDates();
 }
+
 
 // Render date tabs
 function renderDateTabs() {
@@ -2603,12 +2216,32 @@ function renderDateTabs() {
                 console.log('[Tabs] Current date index updated to:', currentDateIndex);
             }
             selectDateTab(date);
-            loadContentForDate(date, false, () => {
-                // Restart sequential preloading from new position immediately
+
+            // Anchor Navigation: Try to find existing content first
+            const anchorEl = document.querySelector(`.gallery-item[data-date="${date}"]`);
+            if (anchorEl) {
+                console.log('[Tabs] Anchor found, scrolling to:', date);
+                // Scroll with offset for header
+                const headerOffset = 80;
+                const elementPosition = anchorEl.getBoundingClientRect().top + window.scrollY;
+                window.scrollTo({
+                    top: elementPosition - headerOffset,
+                    behavior: 'smooth'
+                });
+
+                // Continue preloading sequence from this point if needed
                 if (window.preloadSessionId === currentSession) {
                     loadNextDate(3, currentSession);
                 }
-            }, signal);
+            } else {
+                // Not found, perform full reload/load
+                loadContentForDate(date, false, () => {
+                    // Restart sequential preloading from new position immediately
+                    if (window.preloadSessionId === currentSession) {
+                        loadNextDate(3, currentSession);
+                    }
+                }, signal);
+            }
 
             // Sync mobile nav selection
             syncMobileNavSelection(date);
@@ -2624,29 +2257,91 @@ function renderDateTabs() {
 }
 
 // Highlight the active date tab
+// Highlight the active date tab with Anchor Logic
 function selectDateTab(date) {
-    let foundTab = false;
+    // 1. Check if we can just scroll to an existing anchor
+    const anchor = document.getElementById(`date-anchor-${date}`);
+    if (anchor) {
+        // Anchor exists, scroll to it
+        // Offset for sticky header (approx 120px)
+        const offset = 120;
+        const bodyRect = document.body.getBoundingClientRect().top;
+        const elementRect = anchor.getBoundingClientRect().top;
+        const elementPosition = elementRect - bodyRect;
+        const offsetPosition = elementPosition - offset;
 
-    // First check if date tabs exist on the current page
-    const dateTabs = document.querySelectorAll('.date-tab');
-    if (dateTabs.length === 0) {
-        return false;
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+        });
+        updateDateTabUI(date);
+        return true;
     }
 
-    dateTabs.forEach(tab => {
-        if (tab.getAttribute('data-date') === date) {
+    // 2. Fallback: Load content (Jump/Reset)
+    currentDate = date;
+
+    // Update URL parameter
+    // URL update removed per user request
+    // current state: clean URL
+    // const url = new URL(window.location);
+    // url.searchParams.set('date', date);
+    // window.history.replaceState({}, '', url);
+
+    // Update UI
+    updateDateTabUI(date);
+    syncMobileNavSelection(date);
+
+    // Reset infinite scroll state
+    isLoadingMore = false;
+
+    // Clear and load (Reset Mode)
+    // We pass append=false to clear existing content
+    loadContentForDate(date, false);
+    return true;
+}
+
+// Setup ScrollSpy
+function setupScrollSpy() {
+    const observer = new IntersectionObserver((entries) => {
+        // Find visible section
+        const visibleEntry = entries.find(e => e.isIntersecting);
+        if (visibleEntry) {
+            const date = visibleEntry.target.dataset.date;
+            if (date) {
+                updateDateTabUI(date);
+                syncMobileNavSelection(date);
+            }
+        }
+    }, {
+        rootMargin: '-10% 0px -80% 0px', // Active region near top
+        threshold: 0
+    });
+
+    // Observe function exposed to be called after rendering
+    window.observeDateSections = () => {
+        document.querySelectorAll('.day-section').forEach(section => {
+            observer.observe(section);
+        });
+    };
+
+    // Initial observation
+    setTimeout(window.observeDateSections, 1000);
+}
+
+// Helper to update UI classes only
+function updateDateTabUI(date) {
+    const tabs = document.querySelectorAll('.date-tab, .mobile-date-item');
+    if (tabs.length === 0) return;
+
+    tabs.forEach(tab => {
+        if (tab.getAttribute('data-date') === date || tab.dataset.date === date) {
             tab.classList.add('active');
-            // Scroll tab into view if needed
             tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            foundTab = true;
         } else {
             tab.classList.remove('active');
         }
     });
-
-    // If no tab found for the date, it might be a date with no content
-    // In this case, don't throw an error, just continue
-    return foundTab;
 }
 
 // Setup Date Navigation
@@ -2730,188 +2425,167 @@ function showToast(message, type = 'info', duration = 3000) {
  * @param {Function} callback - Success callback
  * @param {AbortSignal} signal - Abort signal (Linus Mode: for request cancellation)
  */
-function loadContentForDate(date, append = false, callback = null, signal = null) {
-    // First check if we're on the main page
-    const contentList = document.getElementById('contentList');
-    const emptyState = document.getElementById('emptyState');
+/**
+ * Core Stream Loader
+ * Replaces Date-Based Loading with Quantity-Based Loading (Limit 50)
+ */
+async function loadStreamBatch() {
+    if (isStreamLoading || !hasMoreStream) return;
+    isStreamLoading = true;
+    showLoadingIndicator();
 
-    if (!contentList) {
-        // Not on the main page, so don't proceed
-        return Promise.resolve(0);
-    }
+    try {
+        // Construct URL using buildApiUrl for Hybrid Mode support
+        let url = buildApiUrl('/api/tweets') + `?mode=stream&offset=${streamOffset}`;
+        if (streamStartDate) url += `&date=${streamStartDate}`;
+        if (activeGlobalCategory) url += `&category=${encodeURIComponent(activeGlobalCategory)}`;
 
-    // Define storage key for this date
-    const storageKey = `tweets_${date}`;
+        console.log('[Stream] Loading:', url);
 
-    if (!append) {
-        // Clear any existing content and reset
-        contentList.innerHTML = '';
-        emptyState.style.display = 'none';
-        tweetUrls.length = 0;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('API Error');
+        const tweets = await res.json();
 
-        // Clear all tweet observers to prevent memory leaks
-        if (typeof tweetObserver !== 'undefined') {
-            try {
-                tweetObserver.disconnect();
-            } catch (e) {
-                console.warn('Error disconnecting observer:', e);
+        if (tweets.length === 0) {
+            hasMoreStream = false;
+            showEndOfContentMessage();
+        } else {
+            const contentList = document.getElementById('contentList');
+
+            // Check for Main Grid
+            let mainGrid = document.getElementById('main-stream-grid');
+            if (!mainGrid) {
+                // Ensure container structure
+                const container = document.createElement('div');
+                container.className = 'day-section'; // Reuse class for padding/styling
+                container.style.border = 'none';
+
+                mainGrid = document.createElement('div');
+                mainGrid.id = 'main-stream-grid';
+                mainGrid.className = 'image-gallery-grid';
+
+                container.appendChild(mainGrid);
+                contentList.appendChild(container);
             }
+
+            // Prepare Items for Rendering
+            // We need to inject anchor ID into first item of new date
+            const preparedTweets = tweets.map(tweet => {
+                // Ensure date string comparison works
+                const pDate = tweet.publish_date; // Assuming YYYY-MM-DD
+                if (pDate && pDate !== lastRenderedDateStr) {
+                    lastRenderedDateStr = pDate;
+                    tweet._isParamsAnchor = true; // Flag for renderer
+                    tweet._anchorId = `date-anchor-${pDate}`;
+                    // Also update Sidebar Active State if visible?
+                    // IntersectionObserver handles this.
+                }
+                return tweet;
+            });
+
+            // Find parent wrapper for renderImageGallery
+            const container = mainGrid.parentElement;
+
+            // Call Render (Append mode)
+            // Note: renderImageGallery expects mixed content in 'tweets'
+            // We rely on it to append to .image-gallery-grid inside container
+            renderImageGallery(container, true, streamOffset, null, preparedTweets);
+
+            streamOffset += tweets.length;
         }
 
-        // Clear any existing Twitter embeds to prevent conflicts
-        if (window.twttr && window.twttr.widgets) {
-            try {
-                // Remove all existing tweet widgets from the entire document
-                const tweets = document.querySelectorAll('.twitter-tweet, iframe[src*="twitter.com"], iframe[src*="x.com"]');
-                tweets.forEach(tweet => tweet.remove());
-            } catch (e) {
-                console.warn('Error removing existing tweets:', e);
-            }
-        }
-
-        // Show loading state
-        contentList.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading content...</div>';
-        // tweetMediaCache.clear(); // Persistence: Don't clear cache aggressively anymore
+    } catch (e) {
+        console.error('Stream Error:', e);
+    } finally {
+        isStreamLoading = false;
+        hideLoadingIndicator();
     }
-
-    // Phase 2: Hybrid Mode with Test Toggle
-    // Check for 'test_db' query param or localStorage override
-    // Force use New Database API by default
-    const useNewDb = true;
-
-    const formattedDate = formatDate(date);
-    const apiPath = `/api/tweets?date=${formattedDate}`;
-
-    console.log('[App] Using New Database API (/api/tweets)');
-    const startIndex = tweetUrls.length; // Save current length for append
-
-    const fetchOptions = signal ? { signal } : {};
-
-    return apiFetch(apiPath, fetchOptions)
-        .then(r => {
-            if (!r.ok) {
-                if (r.status === 404) {
-                    return [];
-                }
-                throw new Error(`HTTP error! status: ${r.status}`);
-            }
-            return r.json(); // New API returns Object Array (or fallback URL list)
-        })
-        .then(data => {
-            // New format: Array of objects {id, content, ...}, Old format: Array of URLs
-            let tweets = [];
-
-            // Normalize data
-            if (Array.isArray(data)) {
-                tweets = data.map(item => {
-                    if (typeof item === 'string') {
-                        return { id: extractTweetId(item), url: item };
-                    } else if (item && item.id) {
-                        return item;
-                    }
-                    return null;
-                }).filter(Boolean);
-            }
-
-            // Extract just the URLs for legacy processing (reverse to keep newest first)
-            // Note: New API sorts ASC (oldest first), Old API was DESC?
-            // Let's assume we maintain consistent ordering.
-            // If API returns Objects, map to URLs for tweetUrls.
-
-            const urls = tweets.map(t => t.url || `https://x.com/i/status/${t.id}`);
-
-            if (urls.length > 0) {
-                // Reverse array to show newest content first (Standard UI behavior)
-                const reversedUrls = urls.reverse();
-                tweetUrls.push(...reversedUrls);
-
-                if (append) {
-                    // Append mode: render only new content
-                    const currentView = 'gallery'; // Forced gallery mode
-                    if (currentView === 'gallery') {
-                        renderImageGallery(contentList, true, startIndex, date);
-                    } else {
-                        renderTweetList(contentList, true, startIndex, date);
-                    }
-                    isLoadingMore = false;
-                    hideLoadingIndicator();
-                    console.log('[Infinite Scroll] Content loaded successfully for', date);
-
-                    // Execute callback for sequential preloading
-                    if (typeof callback === 'function') {
-                        callback();
-                    }
-                } else {
-                    // Initial mode: render all content
-                    renderContent(false, date);
-                    emptyState.style.display = 'none';
-
-                    // Execute callback for sequential preloading even on initial load
-                    if (typeof callback === 'function') {
-                        callback();
-                    }
-                }
-
-                localStorage.setItem(storageKey, JSON.stringify(urls));
-                showSourceToast('cloud');
-
-                // Update date tab selection only when not in append mode
-                if (!append) {
-                    selectDateTab(date);
-                }
-                return reversedUrls.length;
-            }
-            return 0;
-        })
-        .catch(error => {
-            if (error.name === 'AbortError') {
-                console.log('[Content Load] Fetch aborted for date:', date);
-                return 0;
-            }
-            console.error('Error loading content for date:', date, error);
-
-            // Try to load from localStorage as fallback
-            const savedData = localStorage.getItem(storageKey);
-            if (savedData) {
-                try {
-                    const u = JSON.parse(savedData);
-                    if (Array.isArray(u) && u.length > 0) {
-                        const reversedUrls = u.reverse();
-                        tweetUrls.push(...reversedUrls);
-                        if (append) {
-                            const currentView = 'gallery'; // Forced gallery mode
-                            if (currentView === 'gallery') {
-                                renderImageGallery(contentList, true, startIndex, date);
-                            } else {
-                                renderTweetList(contentList, true, startIndex, date);
-                            }
-                            console.log('[Infinite Scroll] Content loaded from cache (error fallback) for', date);
-                        } else {
-                            renderContent(false, date);
-                            emptyState.style.display = 'none';
-                        }
-                        showSourceToast('cache');
-                        if (!append) selectDateTab(date);
-                        return reversedUrls.length;
-                    }
-                } catch (e) { }
-            }
-
-            if (!append) {
-                contentList.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Failed to load. Please refresh.</div>';
-                emptyState.style.display = 'none';
-            } else {
-                console.log('[Infinite Scroll] Failed to load content for', date);
-            }
-            return 0;
-        })
-        .finally(() => {
-            if (append) {
-                isLoadingMore = false;
-                hideLoadingIndicator();
-            }
-        });
 }
+
+/**
+ * Reset and Load Stream
+ */
+function resetStream(startDate = null, category = null) {
+    if (isStreamLoading && streamOffset > 0) {
+        // Cancel? We can't cancel fetch easily without AbortController
+        // Just proceed, race condition risks are low for now
+    }
+
+    streamOffset = 0;
+    streamStartDate = startDate;
+    activeGlobalCategory = category;
+    lastRenderedDateStr = null;
+    hasMoreStream = true;
+
+    // Clear Content
+    const contentList = document.getElementById('contentList');
+    if (contentList) contentList.innerHTML = '';
+
+    // Reset Infinite Scroll State
+    isStreamLoading = false;
+    hideLoadingIndicator();
+    const endMsg = document.getElementById('endOfContentMessage');
+    if (endMsg) endMsg.style.display = 'none';
+
+    // Update Mode Var
+    currentMode = 'stream';
+
+    // Update UI
+    if (category) {
+        updateSidebarActiveState();
+    }
+
+    // If Date Selected, Update Tabs
+    if (startDate) {
+        updateDateTabUI(startDate);
+        // Sync Mobile
+        if (typeof syncMobileNavSelection === 'function') syncMobileNavSelection(startDate);
+    } else if (category && !startDate) {
+        // Clear tabs if category mode
+        document.querySelectorAll('.date-tab.active').forEach(e => e.classList.remove('active'));
+    }
+
+    // Start Load
+    loadStreamBatch();
+}
+
+/**
+ * Override Date Selection
+ */
+window.selectDateTab = function (date) {
+    // Check if anchor exists in DOM
+    const anchor = document.getElementById(`date-anchor-${date}`);
+    if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth' });
+        updateDateTabUI(date);
+    } else {
+        // Hard Reset Stream starting from Date
+        console.log('[Stream] Jumping to date:', date);
+        resetStream(date, activeGlobalCategory); // Maintain category if active? Or reset?
+        // Usually Date Tab resets Category to All? 
+        // User asked for "Waterfall" -> "Quantity".
+        // Let's keep category null for Date Tabs (Timeline Mode).
+    }
+}
+
+/**
+ * Override Category Selection
+ */
+window.selectCategory = function (cat) {
+    console.log('[Stream] Selecting Category:', cat);
+    if (!cat) { // All
+        resetStream(null, null); // Load latest
+        const dt = document.getElementById('dateTabs');
+        if (dt) dt.style.display = 'flex';
+    } else {
+        resetStream(null, cat);
+    }
+    updateSidebarActiveState();
+}
+
+// Deprecated function stubs
+function loadContentForDate() { console.warn('Deprecated'); return Promise.resolve(0); }
+
 
 // Save daily snapshot (Called by Admin)
 function saveDailySnapshot(date, urls) {
@@ -3336,4 +3010,218 @@ function loadCustomTweetCard(tweetId, container) {
             </div>
         `;
     });
+}
+
+// Sticky Date Indicator Logic
+function initFloatingDateIndicator() {
+    // Create Label
+    const indicator = document.createElement('div');
+    indicator.className = 'sticky-date-indicator';
+    document.body.appendChild(indicator);
+
+    // Create Line (Separate element for z-index control)
+    const line = document.createElement('div');
+    line.className = 'sticky-date-line';
+    document.body.appendChild(line);
+
+    let currentVisibleDate = '';
+    let scrollTimeout;
+
+    const updateIndicator = () => {
+        // Sample point slightly below header (avoid header overlap detection)
+        const sampleX = window.innerWidth / 2;
+        const sampleY = 200; // 200px from top
+
+        const el = document.elementFromPoint(sampleX, sampleY);
+        if (!el) return;
+
+        const item = el.closest('[data-date]');
+        if (item) {
+            const date = item.getAttribute('data-date');
+            if (date && date !== currentVisibleDate) {
+                currentVisibleDate = date;
+                indicator.textContent = date;
+                indicator.classList.add('visible');
+                line.classList.add('visible');
+            }
+        }
+    };
+
+    window.addEventListener('scroll', () => {
+        if (scrollTimeout) return;
+        scrollTimeout = requestAnimationFrame(() => {
+            updateIndicator();
+            scrollTimeout = null;
+        });
+    }, { passive: true });
+}
+
+// Auto-init
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFloatingDateIndicator);
+} else {
+    initFloatingDateIndicator();
+}
+
+// Scroll to Top Logic
+function initScrollToTop() {
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
+
+    // Desktop Header
+    const desktopTitle = document.querySelector('.top-bar-logo');
+    if (desktopTitle) {
+        desktopTitle.addEventListener('click', scrollToTop);
+    }
+
+    // Mobile Header
+    const mobileTitle = document.querySelector('.mobile-nav-title');
+    if (mobileTitle) {
+        mobileTitle.addEventListener('click', scrollToTop);
+    }
+}
+
+// Init Scroll To Top
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initScrollToTop);
+} else {
+    initScrollToTop();
+}
+
+// ==========================================
+// Author Stats & Filtering Logic
+// ==========================================
+
+let activeAuthorFilter = null;
+
+async function initAuthorStats() {
+    const listContainer = document.getElementById('authorList');
+
+    if (!listContainer) return;
+
+    // Reset interaction removed
+
+
+    try {
+        // Fetch stats
+        const res = await apiFetch('/api/stats');
+        if (!res.ok) throw new Error('Status ' + res.status);
+
+        const response = await res.json();
+
+        if (!response || !response.authors) {
+            listContainer.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary)">No stats</div>';
+            return;
+        }
+
+        const authors = response.authors.filter(a => a.name && a.name.toLowerCase() !== 'unknown'); // [{name, count}]
+
+        listContainer.innerHTML = '';
+
+        authors.forEach(author => {
+            const item = document.createElement('div');
+            item.className = 'author-item';
+            // Simple rendering: Name only
+            item.innerHTML = `
+                <span class="author-name">@${author.name}</span>
+                <span class="author-count">${author.count}</span>
+            `;
+
+            // Click behavior: Open Twitter
+            item.addEventListener('click', () => {
+                window.open(`https://x.com/${author.name}`, '_blank');
+            });
+
+            listContainer.appendChild(item);
+        });
+
+    } catch (e) {
+        console.error('Failed to load author stats', e);
+        listContainer.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary)">Error loading stats</div>';
+    }
+}
+
+// Simplified: No longer actively filtering, just navigating
+async function handleAuthorClick(handle, element) {
+    // Deprecated in favor of direct window.open in listener above
+}
+
+// Init
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthorStats);
+} else {
+    initAuthorStats();
+}
+
+// Render Global Category Sidebar (Fetched from Backend)
+async function renderCategories() {
+    const listContainer = document.getElementById('categoryList');
+    if (!listContainer) return;
+
+    try {
+        const res = await fetch(buildApiUrl('/api/categories'));
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const categoryCounts = await res.json(); // {"Art": 10, "Tech": 5}
+
+        let totalCount = 0;
+        const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+        // Sum total
+        Object.values(categoryCounts).forEach(c => totalCount += c);
+
+        let html = `
+            <div class="category-item ${!activeGlobalCategory ? 'active' : ''}" onclick="selectCategory(null)" id="cat-item-all">
+                <span>All</span>
+                <span class="category-count">${totalCount}</span>
+            </div>
+        `;
+
+        categories.forEach(cat => {
+            const count = categoryCounts[cat];
+            // Escape quotes for onclick
+            const safeCat = cat.replace(/'/g, "\\'");
+            html += `
+                <div class="category-item ${activeGlobalCategory === cat ? 'active' : ''}" onclick="selectCategory('${safeCat}')" id="cat-item-${cat.replace(/\s+/g, '-')}">
+                    <span>${cat}</span>
+                    <span class="category-count">${count}</span>
+                </div>
+            `;
+        });
+
+        listContainer.innerHTML = html;
+    } catch (e) {
+        console.error('Error rendering categories:', e);
+        listContainer.innerHTML = '<div style="padding:10px; text-align:center">Failed to load categories</div>';
+    }
+}
+
+function updateSidebarActiveState() {
+    document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+    if (!activeGlobalCategory) {
+        const allBtn = document.getElementById('cat-item-all');
+        if (allBtn) allBtn.classList.add('active');
+    } else {
+        // Try to find by ID first (cleaner)
+        const safeId = 'cat-item-' + activeGlobalCategory.replace(/\s+/g, '-');
+        const btn = document.getElementById(safeId);
+        if (btn) btn.classList.add('active');
+        else {
+            // Fallback text matching
+            document.querySelectorAll('.category-item span:first-child').forEach(span => {
+                if (span.textContent === activeGlobalCategory) span.parentElement.classList.add('active');
+            });
+        }
+    }
+}
+
+
+
+// Init ScrollSpy
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupScrollSpy);
+} else {
+    setupScrollSpy();
 }
