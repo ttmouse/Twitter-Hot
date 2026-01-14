@@ -1245,9 +1245,17 @@
         watchTwitterSdkReady();
 
         function extractUrls(text) {
-            const regex = /https?:\/\/(?:x|twitter)\.com\/[a-zA-Z0-9_]+\/status\/\d+/gi;
+            const regex = /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[a-zA-Z0-9_]+\/status\/\d+/gi;
             const matches = text.match(regex) || [];
-            return [...new Set(matches.map(url => url.replace('x.com', 'twitter.com')))];
+            return [...new Set(matches.map(url => {
+                // Normalize to https
+                let normalized = url.replace(/^http:\/\//i, 'https://');
+                // Replace x.com or www.x.com with twitter.com
+                normalized = normalized.replace(/(?:www\.)?x\.com/i, 'twitter.com');
+                // Ensure www.twitter.com becomes twitter.com for consistency (optional but cleaner)
+                normalized = normalized.replace('www.twitter.com', 'twitter.com');
+                return normalized;
+            }))];
         }
 
         function extractTweetId(url) {
@@ -1768,15 +1776,15 @@
 
                         if (imgUrl) {
                             const mediaHTML = isVideo
-                                ? `<div style="position:relative;">
-                                    <img src="${imgUrl}" alt="Video thumbnail" loading="lazy">
-                                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+                                ? `<div class="media-container video-preview" style="position:relative; cursor: pointer;" data-video-url="${found.url}">
+                                    <img src="${imgUrl}" alt="Video thumbnail" loading="lazy" style="width:100%; display:block;">
+                                    <div class="video-play-overlay" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);pointer-events:none;">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                                             <path d="M8 5v14l11-7z"/>
                                         </svg>
                                     </div>
                                    </div>`
-                                : `<img src="${imgUrl}" alt="Tweet image" loading="lazy">`;
+                                : `<div class="media-container"><img src="${imgUrl}" alt="Tweet image" loading="lazy" style="width:100%; display:block;"></div>`;
                             placeholder.outerHTML = mediaHTML;
                         } else {
                             placeholder.innerHTML = 'No media found';
@@ -2026,6 +2034,37 @@
             if (event.target.classList && event.target.classList.contains('tweet-check-input')) {
                 toggleItemStyle(event.target);
             }
+        });
+
+        // Handle video playback
+        document.addEventListener('click', (event) => {
+            const videoContainer = event.target.closest('.media-container.video-preview');
+            if (!videoContainer) return;
+
+            // Prevent checkbox toggle
+            event.stopPropagation();
+            event.preventDefault();
+
+            const videoUrl = videoContainer.dataset.videoUrl;
+            if (!videoUrl) return;
+
+            // Replace with video
+            const video = document.createElement('video');
+            video.src = videoUrl;
+            video.controls = true;
+            video.autoplay = true;
+            video.style.width = '100%';
+            video.style.maxWidth = '100%';
+            video.style.display = 'block';
+            video.style.borderRadius = 'var(--radius-sm)';
+
+            // Try to set poster from the thumbnail image
+            const thumbImg = videoContainer.querySelector('img');
+            if (thumbImg) {
+                video.poster = thumbImg.src;
+            }
+
+            videoContainer.replaceWith(video);
         });
 
         document.addEventListener('DOMContentLoaded', () => {

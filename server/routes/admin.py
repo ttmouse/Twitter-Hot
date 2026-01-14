@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..db import get_db_connection
 from ..cache import recalculate_stats
 
@@ -106,8 +106,9 @@ def handle_update(handler, payload):
                 beijing_time_ms = snowflake_time + (8 * 60 * 60 * 1000)
                 actual_date = datetime.utcfromtimestamp(beijing_time_ms / 1000).strftime('%Y-%m-%d')
                 
-                # Sanity Check: Date cannot be in the future
-                if actual_date > datetime.now().strftime('%Y-%m-%d'):
+                # Sanity Check: Date cannot be in the future (Beijing Time)
+                current_beijing_date = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d')
+                if actual_date > current_beijing_date:
                     print(f"Skipping future date: {actual_date} for {tweet_id}")
                     skipped_count += 1
                     continue
@@ -118,7 +119,14 @@ def handle_update(handler, payload):
                 cur.execute("""
                     INSERT INTO tweets (tweet_id, publish_date, content, media_urls, author, tags)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (tweet_id) DO NOTHING
+                    ON CONFLICT (tweet_id) DO UPDATE SET
+                        publish_date = EXCLUDED.publish_date,
+                        author = CASE 
+                            WHEN tweets.author->>'screen_name' = 'unknown' OR tweets.author IS NULL 
+                            THEN EXCLUDED.author 
+                            ELSE tweets.author 
+                        END,
+                        updated_at = CURRENT_TIMESTAMP
                 """, (
                     tweet_id,
                     actual_date,
@@ -136,7 +144,7 @@ def handle_update(handler, payload):
         
         body = {
             'ok': True, 
-            'message': f'Inserted {inserted_count}, Skipped {skipped_count}',
+            'message': f'Processed {inserted_count}, Skipped {skipped_count}',
             'inserted': inserted_count,
             'skipped': skipped_count
         }
@@ -173,12 +181,16 @@ def handle_import(handler, payload):
             
             if not post_id: continue
             
+            # Format author correctly for consistency
+            author_json = json.dumps({"name": author, "screen_name": author})
+            
             cur.execute("""
                 UPDATE tweets 
                 SET hierarchical_categories = %s,
-                    flat_tags = %s
+                    flat_tags = %s,
+                    author = %s
                 WHERE tweet_id = %s
-            """, (json.dumps(hierarchical), json.dumps(flat_tags), post_id))
+            """, (json.dumps(hierarchical), json.dumps(flat_tags), author_json, post_id))
             
             if cur.rowcount > 0:
                 updated_count += 1
@@ -188,8 +200,9 @@ def handle_import(handler, payload):
                     VALUES (%s, CURRENT_DATE, %s, %s, %s)
                     ON CONFLICT (tweet_id) DO UPDATE SET
                         hierarchical_categories = EXCLUDED.hierarchical_categories,
-                        flat_tags = EXCLUDED.flat_tags
-                """, (post_id, json.dumps({'id': author}), json.dumps(hierarchical), json.dumps(flat_tags)))
+                        flat_tags = EXCLUDED.flat_tags,
+                        author = EXCLUDED.author
+                """, (post_id, author_json, json.dumps(hierarchical), json.dumps(flat_tags)))
                 updated_count += 1
         
         conn.commit()
