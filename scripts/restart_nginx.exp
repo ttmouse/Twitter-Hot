@@ -1,0 +1,19 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+# Load secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+puts "=== Restarting Nginx ==="
+# Restart frontend to apply nginx.conf changes
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && docker compose restart frontend"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+puts "\nDone."

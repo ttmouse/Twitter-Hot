@@ -230,14 +230,10 @@ logs/
 
 # Secrets
 deploy_secrets.exp
+scripts/deploy_secrets.exp
 
-# Temporary Files
-manual_update*.exp
-manual_broadcast*.py
-query_db.exp
-check_env.exp
-verify_db_stats.py
-*_temp*.exp
-*.txt
+# Scripts & temporary devops files
+scripts/debug_*.exp
+scripts/tmp/
+*.log
 
-*.sql

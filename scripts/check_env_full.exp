@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+# Load secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+puts "=== Checking Environment Config ==="
+
+# Check .env file content for DOCKER_DATABASE_URL
+puts "\nStep 1: Checking .env DOCKER_DATABASE_URL..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && cat .env | grep DOCKER_DATABASE_URL"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}

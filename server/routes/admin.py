@@ -89,7 +89,9 @@ def handle_update(handler, payload):
             parts = norm_url.split('/')
             tweet_id = parts[-1] if parts else ''
             if '?' in tweet_id: tweet_id = tweet_id.split('?')[0]
-            if not tweet_id.isdigit(): continue
+            if not tweet_id.isdigit() or len(tweet_id) < 10: 
+                skipped_count += 1
+                continue
                 
             screen_name = "unknown"
             name_parts = norm_url.split('/')
@@ -103,6 +105,12 @@ def handle_update(handler, payload):
                 snowflake_time = (int(tweet_id) >> 22) + 1288834974657
                 beijing_time_ms = snowflake_time + (8 * 60 * 60 * 1000)
                 actual_date = datetime.utcfromtimestamp(beijing_time_ms / 1000).strftime('%Y-%m-%d')
+                
+                # Sanity Check: Date cannot be in the future
+                if actual_date > datetime.now().strftime('%Y-%m-%d'):
+                    print(f"Skipping future date: {actual_date} for {tweet_id}")
+                    skipped_count += 1
+                    continue
             except:
                 actual_date = date
             

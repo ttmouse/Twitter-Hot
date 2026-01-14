@@ -1,0 +1,23 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+# SQL Query to inspect recent entries
+set sql "SELECT tweet_id, created_at, left(content, 30) as content, author FROM tweets ORDER BY created_at DESC LIMIT 20;"
+
+set cmd "cd /root/twitter-hot && docker compose exec -e PGPASSWORD=TwitterHotSecurePass2026! db psql -U twitteruser -d twitterhot -c \"$sql\""
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

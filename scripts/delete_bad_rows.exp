@@ -1,0 +1,29 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+# Deleting rows created after 2026-01-14 00:00:00
+# User requested "after Jan 14th".
+set sql "DELETE FROM tweets WHERE created_at >= '2026-01-14 00:00:00';"
+set count_sql "SELECT count(*) FROM tweets WHERE created_at >= '2026-01-14 00:00:00';"
+
+# Check count first
+set cmd_check "cd /root/twitter-hot && docker compose exec -e PGPASSWORD=TwitterHotSecurePass2026! db psql -U twitteruser -d twitterhot -c \"$count_sql\""
+
+# Delete command
+set cmd_delete "cd /root/twitter-hot && docker compose exec -e PGPASSWORD=TwitterHotSecurePass2026! db psql -U twitteruser -d twitterhot -c \"$sql\""
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host "$cmd_check && $cmd_delete"
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

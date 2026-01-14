@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+set timeout 60
+
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+# Restart backend
+set cmd "cd /root/twitter-hot && docker compose restart backend"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

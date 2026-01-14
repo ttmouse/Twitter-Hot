@@ -1,0 +1,51 @@
+#!/usr/bin/expect -f
+set timeout 60
+
+# Load secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+puts "=== Fixing CORS and Database Configuration ==="
+
+# Step 1: Upload nginx.conf
+puts "\nStep 1: Uploading updated nginx.conf..."
+spawn rsync -avz -e "ssh -o StrictHostKeyChecking=no" nginx.conf $user@$host:$remote_dir/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# Step 2: Fix .env (Remove POSTGRES_URL causing conflict)
+puts "\nStep 2: Cleaning .env (Removing conflicting POSTGRES_URL)..."
+# We remove lines starting with POSTGRES_URL=
+set cmd "cd $remote_dir && sed -i '/^POSTGRES_URL=/d' .env"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# Step 3: Verify .env has correct DOCKER_DATABASE_URL
+puts "\nStep 3: Verifying .env..."
+set cmd "cd $remote_dir && grep DATABASE_URL .env"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# Step 4: Rebuild Backend (to pick up .env change if copied) and Restart Nginx
+puts "\nStep 4: Rebuilding and Restarting..."
+# Since .env is COPY-ed in Dockerfile, we MUST rebuild backend to update the image's .env!
+set cmd "cd $remote_dir && docker compose up -d --build --remove-orphans"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\n=== Fix Complete ==="

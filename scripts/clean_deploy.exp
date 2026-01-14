@@ -1,0 +1,57 @@
+#!/usr/bin/expect -f
+set timeout 120
+
+# Load secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+puts "=== Starting Clean Deployment ==="
+
+# Step 1: Wipe everything and restart
+puts "\nStep 1: Wiping database volume and restarting..."
+# docker compose down -v removes named volumes declared in 'volumes' section of compose file
+set cmd "cd $remote_dir && docker compose down -v && docker compose up -d"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\nWaiting 15s for Database to initialize..."
+sleep 15
+
+# Step 2: Upload SQL
+puts "\nStep 2: Uploading SQL dump..."
+spawn rsync -avz -e "ssh -o StrictHostKeyChecking=no" prod_dump.sql $user@$host:$remote_dir/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# Step 3: Restore Database
+puts "\nStep 3: Restoring Database..."
+# We need to know who to connect as. We assume twitter_user from .env
+# But psql needs the password. We can use -U twitter_user if configured, 
+# or use postgres superuser if we can access it.
+# Docker postgres image sets up the user defined in env vars.
+set cmd "cd $remote_dir && docker compose exec -T db psql -U twitter_user twitter_hot < prod_dump.sql"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    "relation \"tweets\" already exists" { puts "Table already exists (warning)"; exp_continue }
+    eof
+}
+
+# Step 4: Restart Backend to pick up DB
+puts "\nStep 4: Restarting Backend..."
+spawn ssh -o StrictHostKeyChecking=no $user@$host "cd $remote_dir && docker compose restart backend"
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\n=== Clean Deployment Complete ==="

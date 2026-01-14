@@ -1,0 +1,55 @@
+#!/usr/bin/expect -f
+set timeout 120
+
+# Load secrets
+if {[file exists "deploy_secrets.exp"]} {
+    source "deploy_secrets.exp"
+} else {
+    puts "Error: deploy_secrets.exp not found!"
+    exit 1
+}
+
+puts "=== Recovering Service (Correct Credentials) ==="
+
+# Step 1: Start DB and Backend (No Build/Pull)
+puts "\nStep 1: Ensuring DB and Backend are up..."
+set cmd "cd $remote_dir && docker compose up -d db backend"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\nWaiting 5s..."
+sleep 5
+
+# Step 2: Restore Database
+puts "\nStep 2: Restoring Database (User: twitteruser, DB: twitterhot)..."
+# Using correct user 'twitteruser' and db 'twitterhot' based on debug output
+set cmd "cd $remote_dir && docker compose exec -T db psql -U twitteruser twitterhot < prod_dump.sql"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    "relation \"tweets\" already exists" { puts "Table already exists"; exp_continue }
+    eof
+}
+
+# Step 3: Restart Backend
+puts "\nStep 3: Restarting Backend..."
+set cmd "cd $remote_dir && docker compose restart backend"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+# Step 4: Try Frontend
+puts "\nStep 4: Trying Frontend..."
+set cmd "cd $remote_dir && docker compose up -d frontend"
+spawn ssh -o StrictHostKeyChecking=no $user@$host $cmd
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+puts "\n=== Recovery Complete ==="
