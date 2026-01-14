@@ -35,8 +35,7 @@ rsync -avz --progress \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
   --exclude='.DS_Store' \
-  --exclude='deploy_secrets.exp' \
-  --exclude='.env.local' \
+  --exclude='.env' \
   . $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
 
 echo ""

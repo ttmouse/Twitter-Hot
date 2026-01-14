@@ -240,3 +240,4 @@ verify_db_stats.py
 *_temp*.exp
 *.txt
 
+*.sql

@@ -12,6 +12,10 @@
 
 ## 🚀 快速开始
 
+> [!TIP]
+> **DevOps Standards**: For deployment best practices and environment isolation rules, please refer to **[DEVOPS.md](./DEVOPS.md)**.
+
+
 > [!IMPORTANT]
 > **推文预览功能需要通过 HTTP 服务器访问！**
 > 

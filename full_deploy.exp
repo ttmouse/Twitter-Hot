@@ -18,7 +18,7 @@ expect {
 
 puts "\nStep 2: Syncing files to server..."
 # Using rsync to sync files. Exclude .git and node_modules as they are large/unnecessary.
-spawn rsync -avz --exclude=.git --exclude=node_modules --exclude=deploy_secrets.exp -e "ssh -o StrictHostKeyChecking=no" . $user@$host:$remote_dir/
+spawn rsync -avz --exclude=.git --exclude=node_modules --exclude=deploy_secrets.exp --exclude=.env --exclude=venv --exclude=__pycache__ -e "ssh -o StrictHostKeyChecking=no" . $user@$host:$remote_dir/
 expect {
     "password:" { send "$password\r"; exp_continue }
     eof

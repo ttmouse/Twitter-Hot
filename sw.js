@@ -5,7 +5,10 @@ const MEDIA_CACHE_NAME = 'banana-media-v14';
 const PRE_CACHE_ASSETS = [
     '/',
     '/index.html',
-    '/styles.css',
+    '/css/variables.css',
+    '/css/base.css',
+    '/css/layout.css',
+    '/css/components.css',
     '/app-core.js',
     '/tweet-detail-modal.js',
     '/tweet-detail-modal.css',

@@ -196,9 +196,33 @@ html.light-mode .mobile-sticky-nav {
     display: none;
 }
 
-@media (max-width: 1400px) {
+/* ============================
+   RESPONSIVE SIDEBAR BEHAVIOR
+   ============================ */
 
+/* Wide screens: Show both sidebars */
+@media (min-width: 1720px) {
     .sidebar-right,
+    .sidebar-left {
+        display: block;
+    }
+}
+
+/* Medium screens: Keep left (categories), hide right (authors) */
+@media (max-width: 1719px) and (min-width: 1400px) {
+    .sidebar-right {
+        display: none;
+    }
+    .sidebar-left {
+        display: block;
+    }
+}
+
+/* Narrow screens: Hide both sidebars */
+@media (max-width: 1399px) {
+    .sidebar-right {
+        display: none;
+    }
     .sidebar-left {
         display: none;
     }

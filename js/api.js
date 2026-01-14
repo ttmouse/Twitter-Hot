@@ -56,7 +56,8 @@ function buildApiUrl(path) {
     if (!apiBaseUrl) {
         // Hybrid Mode: If we are on Vercel (or any non-local, non-VPS domain), default to VPS API
         const host = window.location.hostname;
-        if (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('ttmouse.com')) {
+        // Allow Vercel domains to use their own API (relative paths)
+        if (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('ttmouse.com') && !host.includes('vercel.app')) {
             // EXCEPTION: Keep tweet_info on Vercel to use distributed Serverless IPs (avoid 429)
             if (path.includes('tweet_info')) {
                 return path;
