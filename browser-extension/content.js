@@ -9,6 +9,15 @@
     let API_ENDPOINT = DEFAULT_API_ENDPOINT;
     const BUTTON_ID_PREFIX = 'hot-content-btn-';
     const addedTweets = new Set(); // Track already added tweets
+    const MORE_BUTTON_SELECTOR = [
+        '[data-testid="caret"]',
+        '[data-testid="tweetActionButton"]',
+        '[aria-label*="More"]',
+        '[aria-label*="more"]',
+        '[aria-label*="更多"]'
+    ].join(', ');
+    const QUICK_ADD_SELECTOR = '[data-x-quick-add-button="true"] button, [data-x-quick-add-button="true"]';
+    const BOOKMARK_SELECTOR = '[data-testid="bookmark"], [aria-label*="Bookmark"], [aria-label*="收藏"]';
 
     // Load API endpoint from storage
     chrome.storage.sync.get(['apiEndpoint'], (result) => {
@@ -172,6 +181,112 @@
         }, 3000);
     }
 
+    function findMoreButton(tweetElement) {
+        return tweetElement.querySelector(MORE_BUTTON_SELECTOR);
+    }
+
+    function getActiveMenu() {
+        const menus = Array.from(document.querySelectorAll('[role="menu"]'));
+        if (menus.length === 0) return null;
+        const visibleMenus = menus.filter(menu => {
+            const rect = menu.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        });
+        return visibleMenus[visibleMenus.length - 1] || menus[menus.length - 1];
+    }
+
+    function waitForMenu(timeout = 1500) {
+        return new Promise((resolve) => {
+            const existing = getActiveMenu();
+            if (existing) {
+                resolve(existing);
+                return;
+            }
+
+            let resolved = false;
+            const observer = new MutationObserver(() => {
+                const menu = getActiveMenu();
+                if (menu && !resolved) {
+                    resolved = true;
+                    observer.disconnect();
+                    resolve(menu);
+                }
+            });
+
+            observer.observe(document.body, { subtree: true, childList: true });
+
+            setTimeout(() => {
+                if (!resolved) {
+                    observer.disconnect();
+                    resolve(getActiveMenu());
+                }
+            }, timeout);
+        });
+    }
+
+    function findTweetElementFromEvent(target) {
+        if (!target || !target.closest) return null;
+        const direct = target.closest('article[data-testid="tweet"]');
+        if (direct) return direct;
+        if (typeof target.composedPath === 'function') {
+            const path = target.composedPath();
+            const article = path.find(node => node && node.closest && node.closest('article[data-testid="tweet"]'));
+            return article ? article.closest('article[data-testid="tweet"]') : null;
+        }
+        return null;
+    }
+
+    function handleMenuTriggerClick(event) {
+        const target = event.target;
+        if (!target || !target.closest) return;
+
+        const quickAdd = target.closest(QUICK_ADD_SELECTOR);
+        const bookmark = target.closest(BOOKMARK_SELECTOR);
+        if (quickAdd || bookmark) {
+            const actionButton = quickAdd || bookmark;
+            const tryHandle = () => {
+                const tweetElement = findTweetElementFromEvent(actionButton);
+                if (!tweetElement) return false;
+                const tweetId = getTweetId(tweetElement);
+                if (!tweetId) return false;
+                const username = getUsername(tweetElement);
+                if (!username) return false;
+                const tweetUrl = getTweetUrl(tweetId, username);
+                addToHotContent(tweetUrl, actionButton, tweetId);
+                return true;
+            };
+
+            if (!tryHandle()) {
+                setTimeout(() => {
+                    tryHandle();
+                }, 200);
+            }
+            return;
+        }
+
+        const trigger = target.closest(MORE_BUTTON_SELECTOR);
+        if (!trigger) return;
+
+        const tweetElement = trigger.closest('article[data-testid="tweet"]');
+        if (!tweetElement) return;
+
+        const tweetId = getTweetId(tweetElement);
+        if (!tweetId) return;
+
+        const username = getUsername(tweetElement);
+        if (!username) return;
+
+        const tweetUrl = getTweetUrl(tweetId, username);
+
+        waitForMenu().then(menu => {
+            if (menu) {
+                injectIntoMenu(menu, tweetId, tweetUrl);
+            } else {
+                console.log('[Hot Content] No menu found after click');
+            }
+        });
+    }
+
     // Inject menu item into Twitter's dropdown menu
     function injectMenuOption(tweetElement) {
         const tweetId = getTweetId(tweetElement);
@@ -180,43 +295,16 @@
             return;
         }
 
-        const username = getUsername(tweetElement);
-        if (!username) {
-            console.log('[Hot Content] No username found for tweet', tweetId);
-            return;
-        }
-
-        const tweetUrl = getTweetUrl(tweetId, username);
-
-        // Find the "more" button (three dots)
-        const moreButton = tweetElement.querySelector('[data-testid="caret"]');
+        const moreButton = findMoreButton(tweetElement);
         if (!moreButton) {
             console.log('[Hot Content] No more button found for tweet', tweetId);
-            return;
         }
-
-        // Mark this tweet as processed
-        if (moreButton.hasAttribute('data-hot-content-processed')) return;
-        moreButton.setAttribute('data-hot-content-processed', 'true');
-
-        console.log('[Hot Content] Attached listener to tweet', tweetId);
-
-        // Listen for menu opening
-        moreButton.addEventListener('click', () => {
-            console.log('[Hot Content] More button clicked for tweet', tweetId);
-            // Wait for menu to appear
-            setTimeout(() => {
-                injectIntoMenu(tweetId, tweetUrl);
-            }, 100);
-        });
     }
 
     // Inject our option into the opened menu
-    function injectIntoMenu(tweetId, tweetUrl) {
+    function injectIntoMenu(menu, tweetId, tweetUrl) {
         console.log('[Hot Content] Attempting to inject menu for tweet', tweetId);
 
-        // Find the dropdown menu
-        const menu = document.querySelector('[role="menu"]');
         if (!menu) {
             console.log('[Hot Content] No menu found!');
             return;
@@ -224,14 +312,12 @@
 
         console.log('[Hot Content] Menu found:', menu);
 
-        // Check if our option already exists
         if (menu.querySelector('.hot-content-menu-item')) {
             console.log('[Hot Content] Menu item already exists');
             return;
         }
 
-        // Find the dropdown container
-        const dropdown = menu.querySelector('[data-testid="Dropdown"]');
+        const dropdown = menu.querySelector('[data-testid="Dropdown"]') || menu;
         if (!dropdown) {
             console.log('[Hot Content] No dropdown container found!');
             return;
@@ -322,6 +408,7 @@
     // Start observing when DOM is ready
     function init() {
         processAllTweets();
+        document.addEventListener('click', handleMenuTriggerClick, true);
 
         // Observe the main timeline for new tweets
         const timeline = document.querySelector('main');
