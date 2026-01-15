@@ -47,7 +47,14 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // 1. 优先查询新架构的 tweets 表（包含 Grok 导入的数据）
+    const proxyResponse = await fetch('https://ttmouse.com/api/dates').catch(() => null);
+    if (proxyResponse && proxyResponse.ok) {
+      const data = await proxyResponse.json();
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(data);
+      return;
+    }
+
     let result = await pool.query(
       "SELECT DISTINCT publish_date FROM tweets ORDER BY publish_date DESC"
     );
@@ -57,9 +64,7 @@ module.exports = async (req, res) => {
       created_at: null
     }));
 
-    // 2. 如果 tweets 表没有数据，fallback 到旧架构的 daily_tweets 表
     if (dates.length === 0) {
-      console.log('No data in tweets table, checking daily_tweets...');
       result = await pool.query(
         'SELECT date, created_at FROM daily_tweets ORDER BY date DESC'
       );
@@ -74,9 +79,7 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error('Database query error:', error);
 
-    // 如果 tweets 表不存在（旧数据库），尝试只查询 daily_tweets
     if (error.message.includes('tweets') || error.code === '42P01') {
-      console.log('tweets table not found, using daily_tweets fallback...');
       try {
         const fallbackResult = await pool.query(
           'SELECT date, created_at FROM daily_tweets ORDER BY date DESC'

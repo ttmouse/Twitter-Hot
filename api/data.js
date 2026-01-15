@@ -54,14 +54,21 @@ module.exports = async (req, res) => {
   }
 
   try {
+    const proxyResponse = await fetch(`https://ttmouse.com/api/data?date=${encodeURIComponent(date)}`).catch(() => null);
+    if (proxyResponse && proxyResponse.ok) {
+      const data = await proxyResponse.json();
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(data);
+      return;
+    }
+
     const result = await pool.query('SELECT urls FROM daily_tweets WHERE date = $1', [date]);
-    
+
     if (result.rows.length > 0) {
       const urls = result.rows[0].urls;
       res.setHeader('Cache-Control', 'no-store');
       res.json({ date, urls });
     } else {
-      // 如果没有找到数据，返回空数组
       res.setHeader('Cache-Control', 'no-store');
       res.json({ date, urls: [] });
     }
