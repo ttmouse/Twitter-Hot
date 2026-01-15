@@ -70,43 +70,58 @@
             menuItem.textContent = 'Adding...';
         }
 
+        const sendUpdate = async (endpoint, date, url) => {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    date,
+                    urls: [url]
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            return response.json();
+        };
+
         try {
-            // Get current date in local timezone (YYYY-MM-DD format)
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             const today = `${year}-${month}-${day}`;
 
-            console.log('[Hot Content] Adding tweet:', {
-                date: today,
-                localTime: now.toLocaleString(),
-                url: tweetUrl
-            });
+            const primaryEndpoint = API_ENDPOINT || DEFAULT_API_ENDPOINT;
+            let data = null;
+            let endpointUsed = primaryEndpoint;
 
-            const response = await fetch(API_ENDPOINT || DEFAULT_API_ENDPOINT, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    date: today,
-                    urls: [tweetUrl]
-                })
-            });
-
-            console.log('[Hot Content] API Response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[Hot Content] API Error:', errorText);
-                throw new Error(`HTTP error! status: ${response.status}`);
+            try {
+                data = await sendUpdate(primaryEndpoint, today, tweetUrl);
+            } catch (primaryError) {
+                if (primaryEndpoint !== DEFAULT_API_ENDPOINT) {
+                    data = await sendUpdate(DEFAULT_API_ENDPOINT, today, tweetUrl);
+                    endpointUsed = DEFAULT_API_ENDPOINT;
+                    API_ENDPOINT = DEFAULT_API_ENDPOINT;
+                    chrome.storage.sync.set({ apiEndpoint: DEFAULT_API_ENDPOINT }, () => {
+                        if (chrome.runtime.lastError) {
+                            console.warn('[Hot Content] Failed to persist endpoint:', chrome.runtime.lastError);
+                        }
+                    });
+                } else {
+                    throw primaryError;
+                }
             }
 
-            const data = await response.json();
-            console.log('[Hot Content] API Success:', data);
+            if (endpointUsed !== primaryEndpoint) {
+                console.log('[Hot Content] Fallback endpoint used:', endpointUsed);
+            }
 
-            // Mark as added
             addedTweets.add(tweetId);
             menuItem.classList.remove('loading');
             menuItem.classList.add('added');

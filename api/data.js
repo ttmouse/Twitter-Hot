@@ -56,18 +56,25 @@ module.exports = async (req, res) => {
   try {
     const proxyResponse = await fetch(`https://ttmouse.com/api/data?date=${encodeURIComponent(date)}`).catch(() => null);
     if (proxyResponse && proxyResponse.ok) {
-      const data = await proxyResponse.json();
-      res.setHeader('Cache-Control', 'no-store');
-      res.json(data);
-      return;
+      let proxyData = null;
+      try {
+        proxyData = await proxyResponse.json();
+      } catch (e) {
+        proxyData = null;
+      }
+      if (proxyData && Array.isArray(proxyData.urls)) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(proxyData);
+        return;
+      }
     }
 
     const result = await pool.query('SELECT urls FROM daily_tweets WHERE date = $1', [date]);
 
-    if (result.rows.length > 0 && Array.isArray(result.rows[0].urls) && result.rows[0].urls.length > 0) {
-      const urls = result.rows[0].urls;
+    const legacyUrls = result.rows[0] ? result.rows[0].urls : null;
+    if (Array.isArray(legacyUrls) && legacyUrls.length > 0) {
       res.setHeader('Cache-Control', 'no-store');
-      res.json({ date, urls });
+      res.json({ date, urls: legacyUrls });
       return;
     }
 
@@ -76,20 +83,22 @@ module.exports = async (req, res) => {
       [date]
     );
 
-    const urls = tweetResult.rows.map(row => {
-      let screenName = 'unknown';
-      if (row.author) {
-        try {
-          const author = typeof row.author === 'string' ? JSON.parse(row.author) : row.author;
-          if (author && author.screen_name) screenName = author.screen_name;
-        } catch (e) {
-          screenName = 'unknown';
+    const urls = tweetResult.rows
+      .filter(row => row.tweet_id)
+      .map(row => {
+        let screenName = 'unknown';
+        if (row.author) {
+          try {
+            const author = typeof row.author === 'string' ? JSON.parse(row.author) : row.author;
+            if (author && author.screen_name) screenName = author.screen_name;
+          } catch (e) {
+            screenName = 'unknown';
+          }
         }
-      }
-      return screenName === 'unknown'
-        ? `https://x.com/i/status/${row.tweet_id}`
-        : `https://x.com/${screenName}/status/${row.tweet_id}`;
-    });
+        return screenName === 'unknown'
+          ? `https://x.com/i/status/${row.tweet_id}`
+          : `https://x.com/${screenName}/status/${row.tweet_id}`;
+      });
 
     res.setHeader('Cache-Control', 'no-store');
     res.json({ date, urls });
