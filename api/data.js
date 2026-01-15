@@ -64,14 +64,35 @@ module.exports = async (req, res) => {
 
     const result = await pool.query('SELECT urls FROM daily_tweets WHERE date = $1', [date]);
 
-    if (result.rows.length > 0) {
+    if (result.rows.length > 0 && Array.isArray(result.rows[0].urls) && result.rows[0].urls.length > 0) {
       const urls = result.rows[0].urls;
       res.setHeader('Cache-Control', 'no-store');
       res.json({ date, urls });
-    } else {
-      res.setHeader('Cache-Control', 'no-store');
-      res.json({ date, urls: [] });
+      return;
     }
+
+    const tweetResult = await pool.query(
+      'SELECT tweet_id, author FROM tweets WHERE publish_date = $1 ORDER BY created_at ASC',
+      [date]
+    );
+
+    const urls = tweetResult.rows.map(row => {
+      let screenName = 'unknown';
+      if (row.author) {
+        try {
+          const author = typeof row.author === 'string' ? JSON.parse(row.author) : row.author;
+          if (author && author.screen_name) screenName = author.screen_name;
+        } catch (e) {
+          screenName = 'unknown';
+        }
+      }
+      return screenName === 'unknown'
+        ? `https://x.com/i/status/${row.tweet_id}`
+        : `https://x.com/${screenName}/status/${row.tweet_id}`;
+    });
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ date, urls });
   } catch (error) {
     console.error('Database query error:', error);
     res.status(500).json({ error: 'database_error' });
