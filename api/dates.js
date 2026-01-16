@@ -25,9 +25,30 @@ const initTable = async () => {
       )
     `);
     console.log('Table initialized successfully');
-  } catch (error) {
-    console.error('Error initializing table:', error);
-  }
+    } catch (error) {
+      console.error('Database query error:', error);
+      
+      // If tweets table doesn't exist, try only daily_tweets
+      if (error.message && error.message.includes('tweets')) {
+        try {
+          const fallbackResult = await pool.query(
+            'SELECT date, created_at FROM daily_tweets ORDER BY date DESC'
+          );
+          const dates = fallbackResult.rows.map(row => ({
+            date: row.date,
+            created_at: row.created_at
+          }));
+          res.setHeader('Cache-Control', 'no-store');
+          res.json({ dates });
+          return;
+        } catch (fallbackError) {
+          console.error('Fallback query error:', fallbackError);
+          res.status(500).json({ error: 'database_error' });
+        }
+      }
+      
+      res.status(500).json({ error: 'database_error' });
+    }
 };
 
 // 初始化表
@@ -47,12 +68,23 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const proxyResponse = await fetch('https://ttmouse.com/api/dates').catch(() => null);
+    const proxyResponse = await fetch('https://ttmouse.com/api/dates').catch(e => {
+      console.error('[api/dates] Proxy fetch error:', e);
+      return null;
+    });
+    
     if (proxyResponse && proxyResponse.ok) {
-      const data = await proxyResponse.json();
-      res.setHeader('Cache-Control', 'no-store');
-      res.json(data);
-      return;
+      try {
+        const data = await proxyResponse.json();
+        if (data && Array.isArray(data.dates)) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.json(data);
+          return;
+        }
+      } catch (e) {
+        console.error('[api/dates] Failed to parse proxy response:', e);
+        // Fall through to local DB
+      }
     }
 
     let result = await pool.query(

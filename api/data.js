@@ -54,18 +54,22 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const proxyResponse = await fetch(`https://ttmouse.com/api/data?date=${encodeURIComponent(date)}`).catch(() => null);
+    const proxyResponse = await fetch(`https://ttmouse.com/api/data?date=${encodeURIComponent(date)}`).catch(e => {
+      console.error('[api/data] Proxy fetch error:', e);
+      return null;
+    });
+    
     if (proxyResponse && proxyResponse.ok) {
-      let proxyData = null;
       try {
-        proxyData = await proxyResponse.json();
+        const proxyData = await proxyResponse.json();
+        if (proxyData && Array.isArray(proxyData.urls)) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.json(proxyData);
+          return;
+        }
       } catch (e) {
-        proxyData = null;
-      }
-      if (proxyData && Array.isArray(proxyData.urls)) {
-        res.setHeader('Cache-Control', 'no-store');
-        res.json(proxyData);
-        return;
+        console.error('[api/data] Failed to parse proxy response:', e);
+        // Fall through to local DB
       }
     }
 

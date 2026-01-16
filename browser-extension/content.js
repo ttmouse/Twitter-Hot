@@ -11,13 +11,13 @@
     const addedTweets = new Set(); // Track already added tweets
     const MORE_BUTTON_SELECTOR = [
         '[data-testid="caret"]',
-        '[data-testid="tweetActionButton"]',
         '[aria-label*="More"]',
         '[aria-label*="more"]',
         '[aria-label*="更多"]'
     ].join(', ');
     const QUICK_ADD_SELECTOR = '[data-x-quick-add-button="true"] button, [data-x-quick-add-button="true"]';
     const BOOKMARK_SELECTOR = '[data-testid="bookmark"], [aria-label*="Bookmark"], [aria-label*="收藏"]';
+    let isEndpointLoaded = false;
 
     // Load API endpoint from storage
     chrome.storage.sync.get(['apiEndpoint'], (result) => {
@@ -63,20 +63,22 @@
             return;
         }
 
-        if (menuItem.classList.contains('loading') || menuItem.classList.contains('added')) {
+        if (menuItem && (menuItem.classList.contains('loading') || menuItem.classList.contains('added'))) {
             return;
         }
 
-        const labelElement = menuItem.querySelector('.hot-content-menu-label');
-        const originalLabel = labelElement ? labelElement.textContent : menuItem.textContent;
+        const labelElement = menuItem ? menuItem.querySelector('.hot-content-menu-label') : null;
+        const originalLabel = menuItem ? (labelElement ? labelElement.textContent : menuItem.textContent) : null;
 
-        menuItem.classList.add('loading');
-        menuItem.setAttribute('aria-disabled', 'true');
+        if (menuItem) {
+            menuItem.classList.add('loading');
+            menuItem.setAttribute('aria-disabled', 'true');
 
-        if (labelElement) {
-            labelElement.textContent = 'Adding...';
-        } else {
-            menuItem.textContent = 'Adding...';
+            if (labelElement) {
+                labelElement.textContent = 'Adding...';
+            } else {
+                menuItem.textContent = 'Adding...';
+            }
         }
 
         const sendUpdate = async (endpoint, date, url) => {
@@ -132,26 +134,32 @@
             }
 
             addedTweets.add(tweetId);
-            menuItem.classList.remove('loading');
-            menuItem.classList.add('added');
 
-            if (labelElement) {
-                labelElement.textContent = '✓ Added to Hot Content';
-            } else {
-                menuItem.textContent = '✓ Added to Hot Content';
+            if (menuItem) {
+                menuItem.classList.remove('loading');
+                menuItem.classList.add('added');
+
+                if (labelElement) {
+                    labelElement.textContent = '✓ Added to Hot Content';
+                } else {
+                    menuItem.textContent = '✓ Added to Hot Content';
+                }
             }
 
             showNotification('✓ Added to hot content!', 'success');
 
         } catch (error) {
             console.error('Error adding to hot content:', error);
-            menuItem.classList.remove('loading');
-            menuItem.removeAttribute('aria-disabled');
 
-            if (labelElement) {
-                labelElement.textContent = originalLabel;
-            } else {
-                menuItem.textContent = originalLabel;
+            if (menuItem) {
+                menuItem.classList.remove('loading');
+                menuItem.removeAttribute('aria-disabled');
+
+                if (labelElement) {
+                    labelElement.textContent = originalLabel;
+                } else {
+                    menuItem.textContent = originalLabel;
+                }
             }
 
             showNotification('✗ Failed to add. Please try again.', 'error');
@@ -244,6 +252,7 @@
         const bookmark = target.closest(BOOKMARK_SELECTOR);
         if (quickAdd || bookmark) {
             const actionButton = quickAdd || bookmark;
+            const allowButtonMutation = Boolean(quickAdd);
             const tryHandle = () => {
                 const tweetElement = findTweetElementFromEvent(actionButton);
                 if (!tweetElement) return false;
@@ -252,7 +261,7 @@
                 const username = getUsername(tweetElement);
                 if (!username) return false;
                 const tweetUrl = getTweetUrl(tweetId, username);
-                addToHotContent(tweetUrl, actionButton, tweetId);
+                addToHotContent(tweetUrl, allowButtonMutation ? actionButton : null, tweetId);
                 return true;
             };
 
