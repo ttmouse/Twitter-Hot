@@ -218,12 +218,12 @@ def handle_legacy_data(handler, parsed_url):
                 screen_name = "unknown"
                 if author:
                     try:
-        if isinstance(author, str):
-            author_obj = json.loads(author)
-            screen_name = author_obj.get("screen_name", "unknown")
-        except (json.JSONDecodeError, TypeError, AttributeError) as e:
-            print(f"[handle_legacy_data] Failed to parse author for tweet {tweet_id}: {e}")
-            screen_name = "unknown"
+                        if isinstance(author, str):
+                            author_obj = json.loads(author)
+                            screen_name = author_obj.get("screen_name", "unknown")
+                    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+                        print(f"[handle_legacy_data] Failed to parse author for tweet {tweet_id}: {e}")
+                        screen_name = "unknown"
                 if screen_name == "unknown":
                     urls.append(f"https://x.com/i/status/{tweet_id}")
                 else:

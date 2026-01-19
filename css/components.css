@@ -1042,9 +1042,90 @@ body.viewer-open {
     opacity: 1;
 }
 
-.category-item.child.active {
+/* ============================
+   CATEGORY ACCORDION STYLES
+   ============================ */
+.category-group {
+    margin-bottom: 2px;
+}
+
+.category-item.parent {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.category-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.category-toggle.expanded {
+    transform: rotate(90deg);
+}
+
+.category-toggle svg {
+    width: 10px;
+    height: 10px;
+}
+
+.category-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.category-children {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease-out, opacity 0.2s ease;
+    opacity: 0;
+}
+
+.category-children.expanded {
+    max-height: 500px;
     opacity: 1;
-    border-left: 3px solid var(--accent-primary);
+    transition: max-height 0.3s ease-in, opacity 0.2s ease;
+}
+
+.category-children .category-item.child {
+    padding-left: 28px;
+    color: #7a8599;
+    font-size: 0.85rem;
+}
+
+.category-children .category-item.child:hover {
+    color: #9aa5b8;
+}
+
+.category-children .category-item.child.active {
+    color: var(--accent-primary);
+}
+
+/* Sidebar Clear Button */
+.sidebar-clear-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.sidebar-clear-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--accent-primary);
 }
 
 .author-name {

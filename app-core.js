@@ -1196,17 +1196,42 @@ window.selectDateTab = function (date) {
     }
 }
 
+// Accordion: Toggle Category Group (Expand/Collapse)
+window.toggleCategoryGroup = function (parentName, forceExpand = false) {
+    const group = parentName ? document.querySelector(`.category-group[data-parent="${parentName}"]`) : null;
+    const children = group?.querySelector('.category-children');
+    const toggle = group?.querySelector('.category-toggle');
+
+    // Collapse all other expanded groups
+    document.querySelectorAll('.category-children.expanded').forEach(el => {
+        if (el !== children) {
+            el.classList.remove('expanded');
+            el.parentElement.querySelector('.category-toggle')?.classList.remove('expanded');
+        }
+    });
+
+    // If no target group, just collapse all (used when selecting "All")
+    if (!children) return;
+
+    const shouldExpand = forceExpand || !children.classList.contains('expanded');
+    children.classList.toggle('expanded', shouldExpand);
+    toggle?.classList.toggle('expanded', shouldExpand);
+};
+
 // Adapter: Category Selection
 window.selectCategory = function (cat) {
     if (!window.tweetLoader) return;
-    console.log('[Stream] Selecting Category:', cat);
 
-    if (!cat) { // All
+    const clearBtn = document.getElementById('clearCategoryFilter');
+
+    if (!cat) {
         window.tweetLoader.reset(null, null);
-        const dt = document.getElementById('dateTabs');
-        if (dt) dt.style.display = 'flex';
+        window.toggleCategoryGroup(null); // Collapse all
+        if (clearBtn) clearBtn.style.display = 'none';
     } else {
         window.tweetLoader.reset(null, cat);
+        window.toggleCategoryGroup(cat, true);
+        if (clearBtn) clearBtn.style.display = 'flex';
     }
     updateSidebarActiveState();
 }
@@ -1216,16 +1241,18 @@ window.selectAuthor = function (author) {
     if (!window.tweetLoader) return;
     console.log('[Stream] Selecting Author:', author);
 
+    const clearBtn = document.getElementById('clearAuthorFilter');
+
     // Mutual Exclusion: Clear Category when selecting Author
-    // Also clear Start Date to show all history for author? Or keep date?
-    // "Like left side" -> reset everything and filter by Author.
     if (activeAuthorFilter === author) {
         // Toggle OFF (if clicking already active)
         activeAuthorFilter = null;
         window.tweetLoader.reset(null, null, null);
+        if (clearBtn) clearBtn.style.display = 'none';
     } else {
         activeAuthorFilter = author;
         window.tweetLoader.reset(null, null, author);
+        if (clearBtn) clearBtn.style.display = 'flex';
     }
 
     // Update UI
@@ -1244,6 +1271,26 @@ window.selectAuthor = function (author) {
     const allBtn = document.getElementById('cat-item-all');
     if (allBtn) allBtn.classList.add('active');
 }
+
+// Clear Author Filter
+window.clearAuthorFilter = function () {
+    if (!window.tweetLoader) return;
+    
+    activeAuthorFilter = null;
+    window.tweetLoader.reset(null, null, null);
+    
+    // Hide clear button
+    const clearBtn = document.getElementById('clearAuthorFilter');
+    if (clearBtn) clearBtn.style.display = 'none';
+    
+    // Clear active state from all author items
+    document.querySelectorAll('.author-item').forEach(el => el.classList.remove('active'));
+    
+    // Reset category to "All"
+    document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+    const allBtn = document.getElementById('cat-item-all');
+    if (allBtn) allBtn.classList.add('active');
+};
 
 // Deprecated function stubs
 function loadContentForDate() { console.warn('Deprecated'); return Promise.resolve(0); }

@@ -129,7 +129,13 @@
     <!-- Left Sidebar (Taxonomy) -->
     <aside class="sidebar-left">
         <div class="sidebar-title">
-            Categories
+            <span>Categories</span>
+            <button class="sidebar-clear-btn" id="clearCategoryFilter" onclick="window.selectCategory(null)" title="Clear filter" style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
         <div class="category-list" id="categoryList">
             <div style="text-align:center; padding:20px; color:var(--text-secondary);">
@@ -166,7 +172,13 @@
     <!-- Right Sidebar (Fixed) -->
     <aside class="sidebar-right">
         <div class="sidebar-title">
-            Top Authors
+            <span>Top Authors</span>
+            <button class="sidebar-clear-btn" id="clearAuthorFilter" onclick="window.clearAuthorFilter()" title="Clear filter" style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
         <div class="author-list" id="authorList">
             <div style="text-align:center; padding:20px; color:var(--text-secondary);">

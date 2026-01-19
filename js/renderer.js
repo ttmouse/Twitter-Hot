@@ -443,7 +443,7 @@ class TweetRenderer {
     }
 
     /**
-     * Render Categories Sidebar
+     * Render Categories Sidebar (Accordion Style)
      */
     async renderCategories() {
         const listContainer = document.getElementById('categoryList');
@@ -465,7 +465,7 @@ class TweetRenderer {
             const activeCat = window.tweetLoader ? window.tweetLoader.activeGlobalCategory : null;
 
             if (isNestedFormat) {
-                // New nested format
+                // New nested format with accordion
                 const parents = Object.keys(rawData).sort((a, b) => rawData[b].count - rawData[a].count);
                 Object.values(rawData).forEach(p => totalCount += p.count);
 
@@ -479,20 +479,39 @@ class TweetRenderer {
                 parents.forEach(parent => {
                     const parentData = rawData[parent];
                     const safeParent = parent.replace(/'/g, "\\'");
+                    const parentId = parent.replace(/\s+/g, '-');
+                    const hasChildren = parentData.children && Object.keys(parentData.children).length > 0;
+                    
+                    // Check if this parent or any of its children is active
+                    let isParentActive = activeCat === parent;
+                    let isChildActive = false;
+                    if (hasChildren && activeCat) {
+                        isChildActive = Object.keys(parentData.children).includes(activeCat);
+                    }
+                    const shouldExpand = isParentActive || isChildActive;
+
+                    // Parent item - clicking selects AND expands
                     html += `
-                        <div class="category-item parent ${activeCat === parent ? 'active' : ''}" onclick="window.selectCategory('${safeParent}')" id="cat-item-${parent.replace(/\s+/g, '-')}">
-                            <span>${parent}</span>
-                            <span class="category-count">${parentData.count}</span>
-                        </div>
+                        <div class="category-group" data-parent="${safeParent}">
+                            <div class="category-item parent ${isParentActive ? 'active' : ''}" onclick="window.selectCategory('${safeParent}')" id="cat-item-${parentId}">
+                                ${hasChildren ? `<span class="category-toggle ${shouldExpand ? 'expanded' : ''}">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </span>` : ''}
+                                <span class="category-name">${parent}</span>
+                                <span class="category-count">${parentData.count}</span>
+                            </div>
                     `;
 
-                    // Render subcategories if they exist
-                    if (parentData.children && Object.keys(parentData.children).length > 0) {
+                    // Children container (collapsible)
+                    if (hasChildren) {
                         const children = Object.keys(parentData.children).sort((a, b) => parentData.children[b] - parentData.children[a]);
+                        html += `<div class="category-children ${shouldExpand ? 'expanded' : ''}" id="children-${parentId}">`;
                         children.forEach(child => {
                             const childCount = parentData.children[child];
                             const safeChild = child.replace(/'/g, "\\'");
-                            const childId = `cat-item-${parent.replace(/\s+/g, '-')}-${child.replace(/\s+/g, '-')}`;
+                            const childId = `cat-item-${parentId}-${child.replace(/\s+/g, '-')}`;
                             html += `
                                 <div class="category-item child ${activeCat === child ? 'active' : ''}" onclick="window.selectCategory('${safeChild}')" id="${childId}">
                                     <span>${child}</span>
@@ -500,7 +519,9 @@ class TweetRenderer {
                                 </div>
                             `;
                         });
+                        html += `</div>`;
                     }
+                    html += `</div>`; // Close category-group
                 });
             } else {
                 // Old flat format: { "category": count }
