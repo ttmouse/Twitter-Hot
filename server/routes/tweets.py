@@ -79,6 +79,7 @@ def handle_tweets(handler, parsed_url):
     date_str = query.get("date", [""])[0]
     category_str = query.get("category", [""])[0]
     author_str = query.get("author", [""])[0]
+    tag_str = query.get("tag", [""])[0]
     offset = int(query.get("offset", ["0"])[0])
     mode = query.get("mode", [""])[0]
 
@@ -92,7 +93,6 @@ def handle_tweets(handler, parsed_url):
         tweets = []
 
         if mode == "stream":
-            # Quantity-Based Stream Mode
             where_clauses = []
             params = []
 
@@ -108,17 +108,17 @@ def handle_tweets(handler, parsed_url):
                 params.append(category_str)
 
             if author_str:
-                # Filter by author screen_name inside JSONB
-                # author->>'screen_name' is the format
-                # Using ILIKE for case-insensitive matching
                 where_clauses.append("author->>'screen_name' ILIKE %s")
                 params.append(author_str)
+
+            if tag_str:
+                where_clauses.append("flat_tags ? %s")
+                params.append(tag_str)
 
             where_sql = ""
             if where_clauses:
                 where_sql = "WHERE " + " AND ".join(where_clauses)
 
-            # Fetch 50 items
             sql = f"""
                 SELECT tweet_id, content, media_urls, author, tags, hierarchical_categories, flat_tags, publish_date
                 FROM tweets 
@@ -222,7 +222,9 @@ def handle_legacy_data(handler, parsed_url):
                             author_obj = json.loads(author)
                             screen_name = author_obj.get("screen_name", "unknown")
                     except (json.JSONDecodeError, TypeError, AttributeError) as e:
-                        print(f"[handle_legacy_data] Failed to parse author for tweet {tweet_id}: {e}")
+                        print(
+                            f"[handle_legacy_data] Failed to parse author for tweet {tweet_id}: {e}"
+                        )
                         screen_name = "unknown"
                 if screen_name == "unknown":
                     urls.append(f"https://x.com/i/status/{tweet_id}")

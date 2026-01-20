@@ -1218,7 +1218,6 @@ window.toggleCategoryGroup = function (parentName, forceExpand = false) {
     toggle?.classList.toggle('expanded', shouldExpand);
 };
 
-// Adapter: Category Selection
 window.selectCategory = function (cat) {
     if (!window.tweetLoader) return;
 
@@ -1226,17 +1225,30 @@ window.selectCategory = function (cat) {
 
     if (!cat) {
         window.tweetLoader.reset(null, null);
-        window.toggleCategoryGroup(null); // Collapse all
+        window.toggleCategoryGroup(null);
         if (clearBtn) clearBtn.style.display = 'none';
     } else {
         window.tweetLoader.reset(null, cat);
-        window.toggleCategoryGroup(cat, true);
+        const isParent = document.querySelector(`.category-group[data-parent="${cat}"]`);
+        if (isParent) {
+            window.toggleCategoryGroup(cat, true);
+        } else {
+            const activeChild = document.querySelector('.category-item.child.active') 
+                || Array.from(document.querySelectorAll('.category-item.child')).find(el => el.textContent.includes(cat));
+            const parentName = activeChild?.closest('.category-group')?.dataset.parent;
+            if (parentName) window.toggleCategoryGroup(parentName, true);
+        }
         if (clearBtn) clearBtn.style.display = 'flex';
     }
     updateSidebarActiveState();
 }
 
-// Adapter: Author Selection
+window.selectTag = function (tag) {
+    if (!window.tweetLoader) return;
+    window.tweetLoader.reset(null, null, null, tag);
+    document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+}
+
 window.selectAuthor = function (author) {
     if (!window.tweetLoader) return;
     console.log('[Stream] Selecting Author:', author);

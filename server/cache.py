@@ -8,6 +8,7 @@ from .db import get_db_connection
 SERVER_STATS_CACHE = {
     'categories': None,
     'authors': None,
+    'tags': None,
     'last_updated': None
 }
 
@@ -50,7 +51,27 @@ def recalculate_stats():
         
         SERVER_STATS_CACHE['categories'] = category_stats
         
-        # 2. Top Authors
+        # 2. Flat Tags
+        cur.execute("SELECT flat_tags FROM tweets WHERE flat_tags IS NOT NULL")
+        tag_rows = cur.fetchall()
+        
+        tag_counts = Counter()
+        for row in tag_rows:
+            tags = row[0]
+            if not tags: continue
+            if isinstance(tags, str):
+                try: tags = json.loads(tags)
+                except: continue
+            if isinstance(tags, list):
+                for tag in tags:
+                    if tag and isinstance(tag, str):
+                        tag_counts[tag] += 1
+        
+        # Return top 200 tags sorted by count
+        top_tags = [{"name": k, "count": v} for k, v in tag_counts.most_common(200)]
+        SERVER_STATS_CACHE['tags'] = top_tags
+        
+        # 3. Top Authors
         cur.execute("SELECT author FROM tweets")
         rows = cur.fetchall()
         
@@ -84,7 +105,7 @@ def recalculate_stats():
         SERVER_STATS_CACHE['authors'] = top_authors
         SERVER_STATS_CACHE['last_updated'] = datetime.now().isoformat()
         
-        print(f"[Stats] Updated. Categories: {len(category_stats)}, Authors: {len(top_authors)}")
+        print(f"[Stats] Updated. Categories: {len(category_stats)}, Tags: {len(top_tags)}, Authors: {len(top_authors)}")
         cur.close()
         conn.close()
     except Exception as e:

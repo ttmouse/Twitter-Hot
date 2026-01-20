@@ -50,3 +50,13 @@ def handle_stats(handler):
         handler.send_json_response({"authors": SERVER_STATS_CACHE['authors']}, cache_control='public, max-age=60')
     else:
         handler.send_json_error(500, "Stats not available")
+
+def handle_tags(handler):
+    # Check Cache
+    if SERVER_STATS_CACHE['tags'] is None:
+        recalculate_stats()
+    
+    if SERVER_STATS_CACHE['tags'] is not None:
+        handler.send_json_response({"tags": SERVER_STATS_CACHE['tags']}, cache_control='public, max-age=60')
+    else:
+        handler.send_json_error(500, "Tags not available")

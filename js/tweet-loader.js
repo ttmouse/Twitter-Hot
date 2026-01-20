@@ -11,9 +11,9 @@ class TweetStreamLoader {
         this.streamStartDate = null;
         this.activeGlobalCategory = null;
         this.activeAuthor = null;
+        this.activeTag = null;
         this.lastRenderedDateStr = null;
 
-        // Scroll Management
         this.scrollTimeout = null;
         this.initScrollListener();
     }
@@ -56,6 +56,7 @@ class TweetStreamLoader {
             if (this.streamStartDate) url += `&date=${this.streamStartDate}`;
             if (this.activeGlobalCategory) url += `&category=${encodeURIComponent(this.activeGlobalCategory)}`;
             if (this.activeAuthor) url += `&author=${encodeURIComponent(this.activeAuthor)}`;
+            if (this.activeTag) url += `&tag=${encodeURIComponent(this.activeTag)}`;
 
             console.log('[Stream] Loading:', url);
 
@@ -158,20 +159,17 @@ class TweetStreamLoader {
 
     /**
      * Reset Stream (Filter Change)
-     * @param {string|null} startDate 
-     * @param {string|null} category 
-     * @param {string|null} author
      */
-    reset(startDate = null, category = null, author = null) {
+    reset(startDate = null, category = null, author = null, tag = null) {
         this.streamOffset = 0;
         this.streamStartDate = startDate;
         this.activeGlobalCategory = category;
         this.activeAuthor = author;
+        this.activeTag = tag;
         this.lastRenderedDateStr = null;
         this.hasMoreStream = true;
-        this.isStreamLoading = false; // Reset lock
+        this.isStreamLoading = false;
 
-        // Clear Content
         const contentList = document.getElementById('contentList');
         if (contentList) contentList.innerHTML = '';
 
@@ -180,7 +178,6 @@ class TweetStreamLoader {
 
         if (window.hideLoadingIndicator) window.hideLoadingIndicator();
 
-        // Trigger First Load
         this.loadNextBatch();
     }
 }

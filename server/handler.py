@@ -52,6 +52,11 @@ class Handler(SimpleHTTPRequestHandler, ResponseMixin):
             stats.handle_stats(self)
             return
 
+        # Tags API
+        if path == '/api/tags':
+            stats.handle_tags(self)
+            return
+
         # Search API
         if path == '/api/search':
             tweets.handle_search(self, parsed)
