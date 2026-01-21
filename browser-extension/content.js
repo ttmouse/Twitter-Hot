@@ -36,6 +36,9 @@
         // Try to find the link to the tweet
         const link = element.querySelector('a[href*="/status/"]');
         if (!link) return null;
+        
+        // Filter out articles
+        if (link.href.includes('/article/')) return null;
 
         const match = link.href.match(/\/status\/(\d+)/);
         return match ? match[1] : null;

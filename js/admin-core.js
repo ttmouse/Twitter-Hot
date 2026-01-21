@@ -8,8 +8,8 @@ function extractUrls(text) {
     return [...new Set(text.match(regex) || [])];
 }
 
-// Extract tweet ID from URL
 function extractTweetId(url) {
+    if (url.includes('/article/')) return null;
     const match = url.match(/\/status\/(\d+)/);
     return match ? match[1] : null;
 }
