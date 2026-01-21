@@ -248,17 +248,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Quick Delete Logic
+    // Quick Delete Logic - supports URL or ID
     const quickDeleteBtn = document.getElementById('quickDeleteBtn');
     const deleteUrlInput = document.getElementById('deleteUrlInput');
 
     if (quickDeleteBtn && deleteUrlInput) {
         quickDeleteBtn.onclick = async () => {
-            const url = deleteUrlInput.value.trim();
-            if (!url) return showStatus('Please enter a URL', 'error');
+            const input = deleteUrlInput.value.trim();
+            if (!input) return showStatus('Please enter a URL or ID', 'error');
 
-            await window.deleteUrl(url);
-            deleteUrlInput.value = '';
+            const tweetId = extractTweetId(input) || (input.match(/^\d{10,}$/) ? input : null);
+            if (!tweetId) return showStatus('Invalid URL or ID', 'error');
+
+            if (!confirm(`Delete tweet ${tweetId}?`)) return;
+
+            try {
+                const res = await apiFetch('/api/delete_by_id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tweet_id: tweetId })
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    showStatus(data.message, 'success');
+                    deleteUrlInput.value = '';
+                } else {
+                    showStatus(data.message || 'Delete failed', 'error');
+                }
+            } catch (e) {
+                showStatus('Delete failed: ' + e.message, 'error');
+            }
         };
     }
 
